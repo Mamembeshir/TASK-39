@@ -1,0 +1,65 @@
+/*
+Semantic tokens only: pages should use utility classes like bg-background,
+text-muted-foreground, border-border, and shadow-soft instead of hard-coded colors.
+Keep the palette tight and cohesive so layout, auth, and content screens share the
+same visual language.
+*/
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 36 45% 97%;
+  --foreground: 24 26% 17%;
+  --card: 40 38% 99%;
+  --card-foreground: 24 26% 17%;
+  --primary: 18 63% 40%;
+  --primary-foreground: 48 57% 96%;
+  --secondary: 38 30% 89%;
+  --secondary-foreground: 24 26% 17%;
+  --muted: 39 28% 92%;
+  --muted-foreground: 25 15% 39%;
+  --accent: 148 20% 88%;
+  --accent-foreground: 24 26% 17%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 34 29% 84%;
+  --input: 34 29% 84%;
+  --ring: 18 63% 40%;
+  --radius-sm: 0.875rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.5rem;
+  --shadow-soft: 0 14px 34px rgba(71, 52, 31, 0.11);
+}
+
+* { @apply border-border; }
+html { color-scheme: light; }
+body {
+  @apply bg-background font-sans text-foreground;
+  min-height: 100vh;
+}
+
+.shadow-soft { box-shadow: var(--shadow-soft); }
+
+.auth-mesh {
+  background-image:
+    radial-gradient(circle at top, rgba(255, 252, 247, 0.95), rgba(247, 238, 226, 0.94) 42%, rgba(215, 235, 225, 0.6));
+}
+
+.heading-hero {
+  @apply font-serif text-4xl leading-tight tracking-tight text-foreground sm:text-5xl;
+}
+
+.heading-section {
+  @apply font-serif text-2xl leading-tight tracking-tight text-foreground sm:text-3xl;
+}
+
+.body-lg {
+  @apply text-lg leading-8 text-muted-foreground;
+}
+
+.body-base {
+  @apply text-base leading-7 text-muted-foreground;
+}

@@ -1,0 +1,86 @@
+const routePolicies = [
+  { method: "GET", path: "/api/health", auth: "public" },
+  { method: "POST", path: "/api/auth/register", auth: "public" },
+  { method: "POST", path: "/api/auth/login", auth: "public" },
+  { method: "POST", path: "/api/auth/refresh", auth: "public" },
+  { method: "POST", path: "/api/auth/logout", auth: "public" },
+  { method: "GET", path: "/api/auth/me", auth: "user" },
+
+  { method: "PUT", path: "/api/profile/contact", auth: "user" },
+  { method: "GET", path: "/api/profile/me", auth: "user" },
+
+  { method: "POST", path: "/api/favorites/:serviceId", auth: "customer" },
+  { method: "DELETE", path: "/api/favorites/:serviceId", auth: "customer" },
+  { method: "GET", path: "/api/favorites", auth: "customer" },
+  { method: "PUT", path: "/api/compare", auth: "customer" },
+  { method: "GET", path: "/api/compare", auth: "customer" },
+  { method: "GET", path: "/api/quote/jurisdictions", auth: "customer" },
+  { method: "GET", path: "/api/quote/slots", auth: "customer" },
+  { method: "POST", path: "/api/quote", auth: "customer" },
+
+  { method: "POST", path: "/api/orders", auth: "customer" },
+  { method: "GET", path: "/api/orders", auth: "customer" },
+  { method: "GET", path: "/api/orders/:id", auth: "user" },
+  { method: "POST", path: "/api/orders/:id/cancel", auth: "user" },
+  { method: "POST", path: "/api/staff/orders/:id/complete", auth: "staff" },
+  { method: "GET", path: "/api/staff/orders/slots", auth: "staff" },
+  { method: "POST", path: "/api/staff/orders/slots", auth: "staff" },
+  { method: "POST", path: "/api/staff/orders/slots/:id", auth: "staff" },
+  { method: "DELETE", path: "/api/staff/orders/slots/:id", auth: "staff" },
+
+  { method: "GET", path: "/api/services", auth: "public" },
+  { method: "GET", path: "/api/search", auth: "public" },
+  { method: "GET", path: "/api/services/:id", auth: "public" },
+  { method: "GET", path: "/api/services/:id/questions", auth: "public" },
+  { method: "POST", path: "/api/services/:id/questions", auth: "customer" },
+  { method: "GET", path: "/api/services/:id/reviews", auth: "public" },
+  { method: "GET", path: "/api/moderation/questions", auth: "moderation" },
+  { method: "POST", path: "/api/moderation/questions/:id/publish", auth: "moderation" },
+  { method: "POST", path: "/api/moderation/questions/:id/reject", auth: "moderation" },
+  { method: "GET", path: "/api/content", auth: "public" },
+  { method: "GET", path: "/api/content/manage", auth: "staff" },
+  { method: "GET", path: "/api/content/:id", auth: "public" },
+
+  { method: "POST", path: "/api/content", auth: "staff" },
+  { method: "PATCH", path: "/api/content/:id/draft", auth: "staff" },
+  { method: "POST", path: "/api/content/:id/schedule", auth: "staff" },
+  { method: "POST", path: "/api/content/:id/publish", auth: "staff" },
+  { method: "GET", path: "/api/content/:id/versions", auth: "staff" },
+  { method: "POST", path: "/api/content/:id/rollback", auth: "staff" },
+
+  { method: "POST", path: "/api/media", auth: "user" },
+  { method: "DELETE", path: "/api/media/:id", auth: "user" },
+
+  { method: "POST", path: "/api/reviews", auth: "customer" },
+  { method: "GET", path: "/api/moderation/reviews", auth: "moderation" },
+  { method: "POST", path: "/api/moderation/reviews/:id/approve", auth: "moderation" },
+  { method: "POST", path: "/api/moderation/reviews/:id/reject", auth: "moderation" },
+
+  { method: "POST", path: "/api/tickets", auth: "user" },
+  { method: "GET", path: "/api/tickets", auth: "user" },
+  { method: "GET", path: "/api/tickets/:id", auth: "user" },
+  { method: "POST", path: "/api/tickets/:id/status", auth: "user" },
+  { method: "POST", path: "/api/tickets/:id/legal-hold", auth: "staff" },
+  { method: "POST", path: "/api/tickets/:id/resolve", auth: "staff" },
+
+  { method: "POST", path: "/api/staff/messages", auth: "message_staff" },
+  { method: "GET", path: "/api/inbox", auth: "user" },
+  { method: "POST", path: "/api/inbox/:id/read", auth: "user" },
+
+  { method: "POST", path: "/api/staff/services", auth: "staff" },
+  { method: "PATCH", path: "/api/staff/services/:id", auth: "staff" },
+  { method: "POST", path: "/api/staff/services/:id/publish", auth: "staff" },
+  { method: "POST", path: "/api/staff/services/:id/unpublish", auth: "staff" },
+  { method: "POST", path: "/api/staff/bundles", auth: "staff" },
+  { method: "PATCH", path: "/api/staff/bundles/:id", auth: "staff" },
+  { method: "POST", path: "/api/staff/bundles/:id/publish", auth: "staff" },
+  { method: "POST", path: "/api/staff/bundles/:id/unpublish", auth: "staff" },
+
+  { method: "GET", path: "/api/admin/audit", auth: "administrator" },
+  { method: "GET", path: "/api/admin/blacklist", auth: "administrator" },
+  { method: "POST", path: "/api/admin/blacklist", auth: "administrator" },
+];
+
+module.exports = {
+  routePolicies,
+};

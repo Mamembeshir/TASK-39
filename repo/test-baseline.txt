@@ -1,0 +1,48 @@
+PASS: API health endpoint returns 200 and status ok
+PASS: HTTPS reverse proxy health smoke
+PASS: Seed data exists and customer account is present
+PASS: Unique username constraint is enforced
+PASS: Auth login succeeds with seeded account
+PASS: Auth missing token returns 401
+PASS: Auth wrong role returns 403
+PASS: Authorization matrix critical route enforcement
+PASS: Object-level authorization ownership checks
+PASS: Validation errors use consistent shape
+PASS: Auth rejects wrong password
+PASS: Auth locks account on sixth failed attempt
+PASS: Auth rate limit returns 429
+PASS: Catalog hides unpublished services from public
+PASS: Catalog publish makes service visible
+PASS: Catalog rejects invalid service spec
+PASS: Favorites add/get/delete roundtrip
+PASS: Compare list rejects more than five services
+PASS: Order booking concurrency uses atomic slot decrement
+PASS: Media upload rejects oversized file
+PASS: Media duplicate upload deduplicates by hash
+PASS: Quarantined review hidden from public list
+PASS: Ticket create requires order id
+PASS: Ticket resolve outcome is immutable
+PASS: Ticket SLA fields use business-hours fixture
+PASS: Content rollback updates published pointer
+PASS: Media delete blocked when referenced
+PASS: Inbox hides moderator-only message from customer
+PASS: Inbox mark-read persists per user
+PASS: Search returns only published entities
+
+> homecareops-api@1.0.0 search:cleanup
+> node src/scripts/searchCleanup.js
+
+search cleanup completed: removed 0 orphan documents
+PASS: Search cleanup script smoke test
+
+> homecareops-api@1.0.0 retention:cleanup
+> node src/scripts/retentionCleanup.js
+
+retention cleanup completed: processed 0 tickets, deleted 0 blobs
+PASS: Retention cleanup script smoke test
+PASS: Customer views are masked while staff views full contact
+PASS: Blacklisted IP cannot access API
+PASS: Unit password length validation
+PASS: Unit quote pricing matrix
+PASS: Unit production errors omit stack
+TOTAL: 37, PASSED: 37, FAILED: 0
