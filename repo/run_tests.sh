@@ -108,6 +108,7 @@ run_test "Ticket create requires order id" "./API_tests/ticket_missing_order_tes
 run_test "Ticket category routes to deterministic team queue" "./API_tests/ticket_category_routing_test.sh"
 run_test "Ticket resolve outcome is immutable" "./API_tests/ticket_resolve_immutable_test.sh"
 run_test "Ticket staff actions update pause and legal hold state" "./API_tests/ticket_staff_actions_test.sh"
+run_test "Ticket moderator can resolve and legal-hold while customer remains blocked" "./API_tests/ticket_moderator_dispute_actions_test.sh"
 run_test "Retention policy prunes closed ticket attachments unless legal hold" "./API_tests/retention_legal_hold_policy_test.sh"
 run_test "Ticket SLA fields use business-hours fixture" "./API_tests/ticket_sla_fields_test.sh"
 run_test "Scheduled content stays non-public until publish" "./API_tests/content_schedule_visibility_test.sh"

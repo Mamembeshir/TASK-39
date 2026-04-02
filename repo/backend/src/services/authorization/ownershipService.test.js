@@ -26,6 +26,7 @@ test("assertCanAccessTicket allows matching customer and staff", () => {
   const ticket = { customerId: { toString: () => "user-1" } };
   assert.doesNotThrow(() => assertCanAccessTicket({ sub: "user-1", roles: ["customer"] }, ticket));
   assert.doesNotThrow(() => assertCanAccessTicket({ sub: "other", roles: ["service_manager"] }, ticket));
+  assert.doesNotThrow(() => assertCanAccessTicket({ sub: "other", roles: ["moderator"] }, ticket));
 });
 
 test("assertCanAccessTicket hides unauthorized tickets as not found", () => {

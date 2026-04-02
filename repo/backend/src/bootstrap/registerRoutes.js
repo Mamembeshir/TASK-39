@@ -241,7 +241,7 @@ function registerRoutes(deps) {
     createTicketsRouter({
       controller: ticketsController,
       requireAuth,
-      requireStaff: requireRoles(STAFF_ROLES),
+      requireDisputeStaff: requireRoles([...STAFF_ROLES, "moderator"]),
     }),
   );
 

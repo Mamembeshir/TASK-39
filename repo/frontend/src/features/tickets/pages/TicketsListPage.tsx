@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { listTickets } from '@/features/tickets/api/ticketsApi';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { canManageTicketDisputes } from '@/features/tickets/utils/ticketRoles';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { PageShell } from '@/shared/components/PageShell';
@@ -13,7 +14,7 @@ export function TicketsListPage() {
   const auth = useAuth();
   const ticketsQuery = useQuery({ queryKey: ['tickets'], queryFn: listTickets });
   const tickets = ticketsQuery.data ?? [];
-  const isStaff = auth.roles.includes('administrator') || auth.roles.includes('service_manager');
+  const isStaff = canManageTicketDisputes(auth.roles);
 
   return (
     <PageShell>

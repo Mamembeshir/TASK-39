@@ -18,7 +18,7 @@ function isOrderStaff(actor) {
 }
 
 function isTicketStaff(actor) {
-  return hasRole(actor, "administrator") || hasRole(actor, "service_manager");
+  return hasRole(actor, "administrator") || hasRole(actor, "service_manager") || hasRole(actor, "moderator");
 }
 
 function assertCanAccessOrder(actor, order) {

@@ -75,6 +75,26 @@ test("route authorizer maps administrator auth type to administrator role", () =
   assert.deepEqual(recorder.calls, [undefined]);
 });
 
+test("route authorizer maps ticket_dispute_staff to moderator-inclusive staff roles", () => {
+  const requireAuth = () => {};
+  let capturedRoles = null;
+  const requireRole = (...roles) => {
+    capturedRoles = roles;
+    return (req, res, next) => next();
+  };
+  const authorizer = createRouteAuthorizer(
+    [{ method: "POST", path: "/api/tickets/:id/resolve", auth: "ticket_dispute_staff" }],
+    requireAuth,
+    requireRole,
+  );
+
+  const recorder = createNextRecorder();
+  authorizer({ path: "/api/tickets/123/resolve", method: "POST" }, {}, recorder.next);
+
+  assert.deepEqual(capturedRoles, ["administrator", "service_manager", "moderator"]);
+  assert.deepEqual(recorder.calls, [undefined]);
+});
+
 test("route authorizer returns policy config error for invalid auth types", () => {
   const requireAuth = () => {};
   const requireRole = () => () => {};

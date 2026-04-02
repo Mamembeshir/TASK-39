@@ -30,6 +30,9 @@ function policyToMiddleware(auth, requireAuth, requireRole) {
   if (auth === "message_staff") {
     return requireRole("administrator", "service_manager", "moderator");
   }
+  if (auth === "ticket_dispute_staff") {
+    return requireRole("administrator", "service_manager", "moderator");
+  }
   if (auth === "administrator") {
     return requireRole("administrator");
   }

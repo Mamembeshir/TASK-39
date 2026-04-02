@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { getTicket, resolveTicket, setTicketLegalHold, updateTicketStatus } from '@/features/tickets/api/ticketsApi';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { canManageTicketDisputes } from '@/features/tickets/utils/ticketRoles';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { PageShell } from '@/shared/components/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
@@ -47,7 +48,7 @@ export function TicketDetailPage() {
   const attachments = useMemo(() => ticket?.attachmentIds ?? [], [ticket?.attachmentIds]);
   const [now, setNow] = useState(Date.now());
   const [resolutionSummary, setResolutionSummary] = useState('');
-  const isStaff = auth.roles.includes('administrator') || auth.roles.includes('service_manager');
+  const isStaff = canManageTicketDisputes(auth.roles);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
@@ -99,7 +100,7 @@ export function TicketDetailPage() {
         {isStaff && (
           <Card>
             <CardHeader>
-              <CardTitle>Staff actions</CardTitle>
+              <CardTitle>Dispute actions</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="flex flex-wrap gap-2">

@@ -21,7 +21,10 @@ function createTicketsService(deps) {
   }
 
   function isTicketStaff(auth) {
-    return Array.isArray(auth?.roles) && (auth.roles.includes("administrator") || auth.roles.includes("service_manager"));
+    return (
+      Array.isArray(auth?.roles) &&
+      (auth.roles.includes("administrator") || auth.roles.includes("service_manager") || auth.roles.includes("moderator"))
+    );
   }
 
   async function createTicket({ auth, headers, payload }) {

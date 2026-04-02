@@ -60,8 +60,8 @@ const routePolicies = [
   { method: "GET", path: "/api/tickets", auth: "user" },
   { method: "GET", path: "/api/tickets/:id", auth: "user" },
   { method: "POST", path: "/api/tickets/:id/status", auth: "user" },
-  { method: "POST", path: "/api/tickets/:id/legal-hold", auth: "staff" },
-  { method: "POST", path: "/api/tickets/:id/resolve", auth: "staff" },
+  { method: "POST", path: "/api/tickets/:id/legal-hold", auth: "ticket_dispute_staff" },
+  { method: "POST", path: "/api/tickets/:id/resolve", auth: "ticket_dispute_staff" },
 
   { method: "POST", path: "/api/staff/messages", auth: "message_staff" },
   { method: "GET", path: "/api/inbox", auth: "user" },
