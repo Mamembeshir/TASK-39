@@ -6,7 +6,11 @@ BACKEND_DIR="${BACKEND_DIR:-$(pwd)/backend}"
 
 if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
   if command -v docker >/dev/null 2>&1; then
-    exec docker compose run --build --rm test-runner
+    docker compose down --remove-orphans
+    docker compose run --build --rm test-runner
+    status=$?
+    docker compose down --remove-orphans
+    exit "$status"
   fi
 
   echo "run_tests.sh must be run inside test-runner or with docker compose available"
@@ -22,6 +26,10 @@ cleanup() {
   trap - EXIT
   MONGO_URI="$TEST_MONGO_URI" node "$BACKEND_DIR/src/scripts/dropTestDatabase.js" || status=1
   exit "$status"
+}
+
+reset_transient_test_state() {
+  MONGO_URI="$TEST_MONGO_URI" node "$BACKEND_DIR/src/scripts/resetTransientTestState.js"
 }
 
 wait_for_api() {
@@ -42,6 +50,12 @@ run_test() {
   name="$1"
   command="$2"
   total=$((total + 1))
+
+  if ! reset_transient_test_state; then
+    failed=$((failed + 1))
+    echo "FAIL: $name"
+    return
+  fi
 
   if sh -c "$command"; then
     passed=$((passed + 1))
