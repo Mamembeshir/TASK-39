@@ -4,6 +4,8 @@ API_BASE_URL="${API_BASE_URL:-http://api:4000}"
 TEST_MONGO_URI="${TEST_MONGO_URI:-mongodb://mongodb:27017/homecareops_test}"
 BACKEND_DIR="${BACKEND_DIR:-$(pwd)/backend}"
 FRONTEND_DIR="${FRONTEND_DIR:-$(pwd)/frontend}"
+NODE_PATH="${NODE_PATH:-$BACKEND_DIR/node_modules}"
+export NODE_PATH
 
 total=0
 passed=0
@@ -20,7 +22,7 @@ wait_for_api() {
   attempts=0
   until curl -fsS "$API_BASE_URL/api/health" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
-    if [ "$attempts" -ge 60 ]; then
+    if [ "$attempts" -ge 90 ]; then
       echo "API did not become ready in time"
       return 1
     fi

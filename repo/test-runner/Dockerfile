@@ -2,12 +2,16 @@ FROM node:20-alpine
 
 WORKDIR /workspace
 
+ENV BACKEND_DIR=/workspace/backend
+ENV FRONTEND_DIR=/workspace/frontend
+ENV NODE_PATH=/workspace/backend/node_modules
+
 RUN apk add --no-cache curl
 
 COPY backend/package*.json ./backend/
 COPY frontend/package*.json ./frontend/
 
-RUN npm --prefix ./backend ci && npm --prefix ./frontend ci
+RUN npm --prefix ./backend ci --omit=dev && npm --prefix ./frontend ci
 
 COPY backend ./backend
 COPY frontend ./frontend

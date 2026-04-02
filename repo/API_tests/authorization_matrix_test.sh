@@ -12,10 +12,12 @@ assert_code() {
   if [ -n "$token" ]; then
     code=$(curl -sS -o /tmp/authorization_matrix_response.json -w "%{http_code}" -X "$method" "$base_url$path" \
       -H "Authorization: Bearer $token" \
+      -H "X-Expected-Auth-Failure: 1" \
       -H "Content-Type: application/json" \
       -d '{}')
   else
     code=$(curl -sS -o /tmp/authorization_matrix_response.json -w "%{http_code}" -X "$method" "$base_url$path" \
+      -H "X-Expected-Auth-Failure: 1" \
       -H "Content-Type: application/json" \
       -d '{}')
   fi

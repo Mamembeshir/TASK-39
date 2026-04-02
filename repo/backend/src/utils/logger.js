@@ -20,11 +20,25 @@ const logger = pino({
 const requestLogger = pinoHttp({
   logger,
   genReqId: (req, res) => req.headers["x-request-id"] || crypto.randomUUID(),
+  customLogLevel: (req, res, err) => {
+    if (err || res.statusCode >= 500) {
+      return "error";
+    }
+    if (res.statusCode >= 400) {
+      const expectedAuthFailure = req.headers["x-expected-auth-failure"] === "1";
+      if (expectedAuthFailure && (res.statusCode === 401 || res.statusCode === 403)) {
+        return "debug";
+      }
+      return "warn";
+    }
+    return "info";
+  },
   customProps: (req, res) => ({
     requestId: req.id,
     userId: req.auth?.userId || null,
     route: req.route?.path || req.path,
     outcome: res.statusCode,
+    expectedAuthFailure: req.headers["x-expected-auth-failure"] === "1",
   }),
   serializers: {
     req: (req) => ({
