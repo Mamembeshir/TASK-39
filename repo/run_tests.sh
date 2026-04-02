@@ -1,89 +1,32 @@
 #!/bin/sh
 
-API_BASE_URL="${API_BASE_URL:-}"
+API_BASE_URL="${API_BASE_URL:-http://api:4000}"
 TEST_MONGO_URI="${TEST_MONGO_URI:-mongodb://mongodb:27017/homecareops_test}"
 BACKEND_DIR="${BACKEND_DIR:-$(pwd)/backend}"
-FRONTEND_DIR="${FRONTEND_DIR:-$(pwd)/frontend}"
-NODE_PATH="${NODE_PATH:-$BACKEND_DIR/node_modules}"
-export NODE_PATH
 
-API_BASE_URL_CANDIDATES="http://api:4000 http://127.0.0.1:4000 http://localhost:4000"
+if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
+  if command -v docker >/dev/null 2>&1; then
+    exec docker compose run --build --rm test-runner
+  fi
 
-if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ] && command -v docker >/dev/null 2>&1; then
-  exec docker compose run --build --rm test-runner
+  echo "run_tests.sh must be run inside test-runner or with docker compose available"
+  exit 1
 fi
 
 total=0
 passed=0
 failed=0
 
-try_api_health() {
-  if [ -n "$API_BASE_URL" ] && curl -fsS "$API_BASE_URL/api/health" >/dev/null 2>&1; then
-    return 0
-  fi
-
-  for candidate in $API_BASE_URL_CANDIDATES; do
-    if curl -fsS "$candidate/api/health" >/dev/null 2>&1; then
-      API_BASE_URL="$candidate"
-      export API_BASE_URL
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-has_local_backend_deps() {
-  node -e 'require.resolve("mongodb")' >/dev/null 2>&1
-}
-
-docker_cleanup_test_database() {
-  docker compose exec -T -e MONGO_URI="$TEST_MONGO_URI" api node /app/backend/src/scripts/dropTestDatabase.js
-}
-
-cleanup_test_database() {
-  if has_local_backend_deps; then
-    MONGO_URI="$TEST_MONGO_URI" node "$BACKEND_DIR/src/scripts/dropTestDatabase.js"
-    return $?
-  fi
-
-  if command -v docker >/dev/null 2>&1; then
-    docker_cleanup_test_database
-    return $?
-  fi
-
-  echo "Unable to clean up test database: local mongodb dependency missing and docker is unavailable"
-  return 1
-}
-
-run_backend_unit_tests() {
-  if [ -d "$BACKEND_DIR/node_modules" ]; then
-    npm --prefix "$BACKEND_DIR" run test:unit
-    return $?
-  fi
-
-  docker compose exec -T api sh -lc 'npm --prefix /app/backend run test:unit'
-}
-
-run_frontend_tests() {
-  if [ -d "$FRONTEND_DIR/node_modules" ]; then
-    npm --prefix "$FRONTEND_DIR" test
-    return $?
-  fi
-
-  docker compose exec -T frontend sh -lc 'cd /app/frontend && npm test'
-}
-
 cleanup() {
   status=$?
   trap - EXIT
-  cleanup_test_database || status=1
+  MONGO_URI="$TEST_MONGO_URI" node "$BACKEND_DIR/src/scripts/dropTestDatabase.js" || status=1
   exit "$status"
 }
 
 wait_for_api() {
   attempts=0
-  until try_api_health; do
+  until curl -fsS "$API_BASE_URL/api/health" >/dev/null 2>&1; do
     attempts=$((attempts + 1))
     if [ "$attempts" -ge 90 ]; then
       echo "API did not become ready in time"
@@ -100,7 +43,7 @@ run_test() {
   command="$2"
   total=$((total + 1))
 
-  if eval "$command"; then
+  if sh -c "$command"; then
     passed=$((passed + 1))
     echo "PASS: $name"
   else
@@ -165,11 +108,11 @@ run_test "Customer views are masked while staff views full contact" "./API_tests
 run_test "Admin blacklist endpoint blocks forwarded IP" "./API_tests/admin_blacklist_upsert_test.sh"
 run_test "Staff inbox messages respect role visibility" "./API_tests/inbox_staff_visibility_test.sh"
 run_test "Blacklisted IP cannot access API" "./API_tests/blacklist_ip_test.sh"
-run_test "Backend node unit and service tests" "run_backend_unit_tests"
+run_test "Backend node unit and service tests" "npm --prefix ./backend run test:unit"
 run_test "Unit password length validation" "./unit_tests/password_length_test.sh"
 run_test "Unit quote pricing matrix" "./unit_tests/quote_pricing_test.sh"
 run_test "Unit production errors omit stack" "./unit_tests/production_error_no_stack_test.sh"
-run_test "Frontend Vitest suite" "run_frontend_tests"
+run_test "Frontend Vitest suite" "npm --prefix ./frontend test"
 
 echo "TOTAL: $total, PASSED: $passed, FAILED: $failed"
 

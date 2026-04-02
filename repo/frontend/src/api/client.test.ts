@@ -46,7 +46,7 @@ describe('api client.request', () => {
     }
   });
 
-  it('throws typed ApiError from JSON response and triggers 401 hook once', async () => {
+  it('throws typed ApiError from JSON response without triggering unauthorized hook for auth endpoints', async () => {
     const unauthorizedSpy = vi.fn();
     setOnUnauthorized(unauthorizedSpy);
 
@@ -75,7 +75,7 @@ describe('api client.request', () => {
       details: [{ field: 'token', message: 'Missing bearer token' }],
     });
 
-    expect(unauthorizedSpy).toHaveBeenCalledTimes(1);
+    expect(unauthorizedSpy).not.toHaveBeenCalled();
   });
 
   it('throws network ApiError when fetch fails', async () => {
@@ -191,7 +191,7 @@ describe('api client.request', () => {
     expect(initArg.headers.get('Content-Type')).toBeNull();
   });
 
-  it('uses fallback http error shape for non-json responses and still triggers unauthorized hook', async () => {
+  it('uses fallback http error shape for non-json auth endpoint responses without triggering unauthorized hook', async () => {
     const unauthorizedSpy = vi.fn();
     setOnUnauthorized(unauthorizedSpy);
 
@@ -209,6 +209,30 @@ describe('api client.request', () => {
       code: 'HTTP_401',
       message: 'Unauthorized plain text',
     });
+
+    expect(unauthorizedSpy).not.toHaveBeenCalled();
+  });
+
+  it('triggers unauthorized hook once for parallel non-auth 401 responses', async () => {
+    const unauthorizedSpy = vi.fn();
+    setOnUnauthorized(unauthorizedSpy);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+
+    await Promise.allSettled([
+      client.request({ method: 'GET', path: '/api/orders' }),
+      client.request({ method: 'GET', path: '/api/profile/me' }),
+    ]);
+
+    await Promise.resolve();
 
     expect(unauthorizedSpy).toHaveBeenCalledTimes(1);
   });

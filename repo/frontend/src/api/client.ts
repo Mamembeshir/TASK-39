@@ -21,6 +21,7 @@ type RequestOptions = {
 type UnauthorizedHandler = () => void;
 
 let onUnauthorized: UnauthorizedHandler | null = null;
+let unauthorizedHandlerInFlight = false;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -74,6 +75,29 @@ function readCookie(name: string) {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+function shouldTriggerUnauthorizedHandler(path: string, status: number) {
+  if (status !== 401 || !onUnauthorized) {
+    return false;
+  }
+
+  return !path.startsWith('/api/auth/');
+}
+
+function triggerUnauthorizedHandler() {
+  if (!onUnauthorized || unauthorizedHandlerInFlight) {
+    return;
+  }
+
+  unauthorizedHandlerInFlight = true;
+  queueMicrotask(() => {
+    try {
+      onUnauthorized?.();
+    } finally {
+      unauthorizedHandlerInFlight = false;
+    }
+  });
+}
+
 async function request<T>(options: RequestOptions): Promise<T> {
   ensureValidPath(options.path);
 
@@ -122,8 +146,8 @@ async function request<T>(options: RequestOptions): Promise<T> {
   }
 
   if (!response.ok) {
-    if (response.status === 401 && onUnauthorized) {
-      onUnauthorized();
+    if (shouldTriggerUnauthorizedHandler(options.path, response.status)) {
+      triggerUnauthorizedHandler();
     }
 
     throw toApiError(
@@ -138,6 +162,7 @@ async function request<T>(options: RequestOptions): Promise<T> {
 
 export function setOnUnauthorized(handler: UnauthorizedHandler | null) {
   onUnauthorized = handler;
+  unauthorizedHandlerInFlight = false;
 }
 
 export const client = {
