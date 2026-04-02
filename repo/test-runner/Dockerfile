@@ -5,6 +5,7 @@ WORKDIR /workspace
 ENV BACKEND_DIR=/workspace/backend
 ENV FRONTEND_DIR=/workspace/frontend
 ENV NODE_PATH=/workspace/backend/node_modules
+ENV RUN_TESTS_IN_CONTAINER=1
 
 RUN apk add --no-cache curl
 
