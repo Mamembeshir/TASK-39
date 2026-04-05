@@ -4,13 +4,19 @@ function createTicketsService(deps) {
     assertCanAccessTicket,
     computeSlaDeadlines,
     createError,
+    ObjectId,
     ticketsRepository,
     SLA_FIRST_RESPONSE_MINUTES,
     SLA_RESOLUTION_MINUTES,
+    writeAuditLog,
   } = deps;
 
   const CATEGORY_ROUTING = {
     billing: { team: "billing_ops", queue: "billing_queue" },
+    scheduling: { team: "service_ops", queue: "dispatch_queue" },
+    service_quality: { team: "service_ops", queue: "service_recovery_queue" },
+    access_issue: { team: "service_ops", queue: "dispatch_queue" },
+    general_support: { team: "customer_care", queue: "general_queue" },
     service_issue: { team: "service_ops", queue: "service_recovery_queue" },
     safety: { team: "trust_safety", queue: "safety_queue" },
     technical: { team: "platform_support", queue: "technical_queue" },
@@ -25,6 +31,64 @@ function createTicketsService(deps) {
       Array.isArray(auth?.roles) &&
       (auth.roles.includes("administrator") || auth.roles.includes("service_manager") || auth.roles.includes("moderator"))
     );
+  }
+
+  const CUSTOMER_STATUS_TRANSITIONS = {
+    open: ["open"],
+    waiting_on_customer: ["open"],
+  };
+
+  const STAFF_STATUS_TRANSITIONS = {
+    open: ["open", "waiting_on_customer"],
+    waiting_on_customer: ["waiting_on_customer", "open"],
+  };
+
+  function normalizeStatus(status) {
+    return typeof status === "string" ? status.trim().toLowerCase() : "";
+  }
+
+  function isMediaOwnedByActor(media, actorId) {
+    if (!actorId || !media) {
+      return false;
+    }
+
+    const createdBy = media.createdBy?.toString?.() || null;
+    if (createdBy && createdBy === actorId) {
+      return true;
+    }
+
+    if (Array.isArray(media.ownerIds)) {
+      return media.ownerIds.some((ownerId) => (ownerId?.toString?.() || String(ownerId)) === actorId);
+    }
+
+    return false;
+  }
+
+  function hasAttachmentId(currentAttachmentIds, mediaId) {
+    if (!Array.isArray(currentAttachmentIds)) {
+      return false;
+    }
+    const normalizedId = mediaId?.toString?.() || String(mediaId);
+    return currentAttachmentIds.some((attachmentId) => (attachmentId?.toString?.() || String(attachmentId)) === normalizedId);
+  }
+
+  function assertTicketAttachmentMedia({
+    actorId,
+    allowTicketExisting = false,
+    currentAttachmentIds = [],
+    mediaDocs,
+  }) {
+    for (const media of mediaDocs) {
+      if (media?.purpose !== "ticket") {
+        throw createError(400, "INVALID_ATTACHMENT_PURPOSE", "ticket attachments must use purpose=ticket");
+      }
+
+      const owned = isMediaOwnedByActor(media, actorId);
+      const alreadyAttachedToTicket = allowTicketExisting && hasAttachmentId(currentAttachmentIds, media?._id);
+      if (!owned && !alreadyAttachedToTicket) {
+        throw createError(403, "MEDIA_FORBIDDEN", "One or more attachments are not owned by requester");
+      }
+    }
   }
 
   async function createTicket({ auth, headers, payload }) {
@@ -59,6 +123,8 @@ function createTicketsService(deps) {
     if (mediaDocs.length !== parsedAttachmentIds.length) {
       throw createError(400, "MEDIA_NOT_FOUND", "One or more attachments were not found");
     }
+    const actorId = auth?.sub || auth?.userId || null;
+    assertTicketAttachmentMedia({ actorId, mediaDocs });
 
     const settings = await ticketsRepository.findSettings();
     const timeZone = settings?.organizationTimezone || "America/Los_Angeles";
@@ -86,6 +152,9 @@ function createTicketsService(deps) {
     });
 
     const normalizedCategory = category.trim().toLowerCase();
+    if (!normalizedCategory) {
+      throw createError(400, "INVALID_CATEGORY", "category is required");
+    }
     const routing = resolveCategoryRouting(normalizedCategory);
 
     const result = await ticketsRepository.insertTicket({
@@ -172,7 +241,7 @@ function createTicketsService(deps) {
     }));
   }
 
-  async function updateTicketStatus({ auth, ticketId, status }) {
+  async function updateTicketStatus({ auth, ticketId, status, req }) {
     const ticket = await ticketsRepository.findTicketById(ticketId);
     try {
       assertCanAccessTicket(auth, ticket);
@@ -188,13 +257,28 @@ function createTicketsService(deps) {
       throw createError(409, "IMMUTABLE_OUTCOME", "Resolved ticket outcome is immutable");
     }
 
+    const normalizedStatus = normalizeStatus(status);
+    if (!normalizedStatus || !["open", "waiting_on_customer"].includes(normalizedStatus)) {
+      throw createError(400, "INVALID_STATUS", "status must be one of open or waiting_on_customer");
+    }
+
+    const currentStatus = normalizeStatus(ticket.status);
+    const transitionPolicy = isTicketStaff(auth) ? STAFF_STATUS_TRANSITIONS : CUSTOMER_STATUS_TRANSITIONS;
+    const allowedTargets = transitionPolicy[currentStatus] || [];
+    if (!allowedTargets.includes(normalizedStatus)) {
+      if (isTicketStaff(auth)) {
+        throw createError(409, "INVALID_STATUS_TRANSITION", "status transition is not allowed");
+      }
+      throw createError(403, "FORBIDDEN_STATUS_TRANSITION", "status transition is not allowed for this role");
+    }
+
     const now = new Date();
-    const updates = { status, updatedAt: now };
-    if (status === "waiting_on_customer" && !ticket.sla?.isPaused) {
+    const updates = { status: normalizedStatus, updatedAt: now };
+    if (normalizedStatus === "waiting_on_customer" && !ticket.sla?.isPaused) {
       updates["sla.isPaused"] = true;
       updates["sla.pausedAt"] = now;
     }
-    if (status !== "waiting_on_customer" && ticket.sla?.isPaused && ticket.sla?.pausedAt) {
+    if (normalizedStatus !== "waiting_on_customer" && ticket.sla?.isPaused && ticket.sla?.pausedAt) {
       const pausedAt = new Date(ticket.sla.pausedAt);
       const pauseDurationMs = now.getTime() - pausedAt.getTime();
       const currentResolutionDueAt = new Date(ticket.sla.resolutionDueAt);
@@ -204,14 +288,40 @@ function createTicketsService(deps) {
     }
 
     await ticketsRepository.updateTicketById(ticketId, updates);
-    return { status };
+    await writeAuditLog({
+      username: auth?.username,
+      userId: auth?.sub ? new ObjectId(auth.sub) : null,
+      action: "ticket.status.update",
+      outcome: "success",
+      req,
+      details: {
+        ticketId: ticketId.toString(),
+        fromStatus: currentStatus,
+        toStatus: normalizedStatus,
+      },
+    });
+
+    return { status: normalizedStatus };
   }
 
-  async function setTicketLegalHold({ ticketId, legalHold }) {
+  async function setTicketLegalHold({ auth, ticketId, legalHold, req }) {
     const updated = await ticketsRepository.updateTicketLegalHold(ticketId, legalHold);
     if (updated.matchedCount === 0) {
       throw createError(404, "TICKET_NOT_FOUND", "Ticket not found");
     }
+
+    await writeAuditLog({
+      username: auth?.username,
+      userId: auth?.sub ? new ObjectId(auth.sub) : null,
+      action: "ticket.legal_hold.update",
+      outcome: "success",
+      req,
+      details: {
+        ticketId: ticketId.toString(),
+        legalHold,
+      },
+    });
+
     return { legalHold };
   }
 
@@ -245,6 +355,14 @@ function createTicketsService(deps) {
       throw createError(400, "MEDIA_NOT_FOUND", "One or more attachments were not found");
     }
 
+    const actorId = auth?.sub || auth?.userId || null;
+    assertTicketAttachmentMedia({
+      actorId,
+      allowTicketExisting: true,
+      currentAttachmentIds: ticket.attachmentIds || [],
+      mediaDocs,
+    });
+
     const outcome = {
       resolvedAt: new Date(),
       summaryText: summaryText.trim(),
@@ -263,6 +381,10 @@ function createTicketsService(deps) {
       action: "ticket.outcome.resolved",
       outcome: "success",
       req,
+      details: {
+        ticketId: ticketId.toString(),
+        attachmentCount: parsedAttachmentIds.length,
+      },
     });
 
     return {

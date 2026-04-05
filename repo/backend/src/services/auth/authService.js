@@ -6,21 +6,40 @@ const usersRepository = require("../../repositories/usersRepository");
 const { validatePasswordLength } = require("../../validators");
 
 function resolveJwtSecrets(env = process.env) {
+  const nodeEnv = env.NODE_ENV || "development";
   const accessSecret = env.JWT_ACCESS_SECRET;
   const refreshSecret = env.JWT_REFRESH_SECRET;
+  const defaultAccessSecret = "dev-access-secret-change-me";
+  const defaultRefreshSecret = "dev-refresh-secret-change-me";
+  const disallowedPlaceholders = new Set([
+    defaultAccessSecret,
+    defaultRefreshSecret,
+    "replace-with-strong-secret",
+  ]);
 
-  if (env.NODE_ENV === "production") {
-    if (!accessSecret) {
-      throw new Error("JWT_ACCESS_SECRET is required in production");
-    }
-    if (!refreshSecret) {
-      throw new Error("JWT_REFRESH_SECRET is required in production");
-    }
+  if (nodeEnv === "test") {
+    return {
+      accessSecret: accessSecret || `test-access-${crypto.randomBytes(24).toString("hex")}`,
+      refreshSecret: refreshSecret || `test-refresh-${crypto.randomBytes(24).toString("hex")}`,
+    };
+  }
+
+  if (!accessSecret) {
+    throw new Error("JWT_ACCESS_SECRET is required when NODE_ENV is not test");
+  }
+  if (!refreshSecret) {
+    throw new Error("JWT_REFRESH_SECRET is required when NODE_ENV is not test");
+  }
+  if (disallowedPlaceholders.has(accessSecret)) {
+    throw new Error("JWT_ACCESS_SECRET must not use default placeholder values");
+  }
+  if (disallowedPlaceholders.has(refreshSecret)) {
+    throw new Error("JWT_REFRESH_SECRET must not use default placeholder values");
   }
 
   return {
-    accessSecret: accessSecret || "dev-access-secret-change-me",
-    refreshSecret: refreshSecret || "dev-refresh-secret-change-me",
+    accessSecret,
+    refreshSecret,
   };
 }
 

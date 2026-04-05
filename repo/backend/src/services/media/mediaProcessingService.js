@@ -32,20 +32,50 @@ function detectMimeFromMagicBytes(buffer) {
 }
 
 function createMediaProcessingService({ mediaEnableProcessing }) {
+  function normalizeCrop(crop) {
+    if (!crop || typeof crop !== "object") {
+      return null;
+    }
+
+    const x = Number(crop.x);
+    const y = Number(crop.y);
+    const width = Number(crop.width);
+    const height = Number(crop.height);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+      return null;
+    }
+    if (width <= 0 || height <= 0 || x < 0 || y < 0) {
+      return null;
+    }
+
+    return {
+      left: Math.trunc(x),
+      top: Math.trunc(y),
+      width: Math.trunc(width),
+      height: Math.trunc(height),
+    };
+  }
+
   return {
-    maybeCompressImage: async (buffer, mimeType) => {
+    maybeCompressImage: async (buffer, mimeType, crop) => {
       if (!mediaEnableProcessing) {
         return buffer;
       }
 
+      const normalizedCrop = normalizeCrop(crop);
+      let pipeline = sharp(buffer);
+      if (normalizedCrop) {
+        pipeline = pipeline.extract(normalizedCrop);
+      }
+
       if (mimeType === "image/jpeg") {
-        return sharp(buffer).jpeg({ quality: 80, mozjpeg: true }).toBuffer();
+        return pipeline.jpeg({ quality: 80, mozjpeg: true }).toBuffer();
       }
       if (mimeType === "image/png") {
-        return sharp(buffer).png({ compressionLevel: 9 }).toBuffer();
+        return pipeline.png({ compressionLevel: 9 }).toBuffer();
       }
       if (mimeType === "image/webp") {
-        return sharp(buffer).webp({ quality: 75 }).toBuffer();
+        return pipeline.webp({ quality: 75 }).toBuffer();
       }
       return buffer;
     },

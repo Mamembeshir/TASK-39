@@ -1,6 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+process.env.NODE_ENV = "test";
+
 const {
   applyRateLimit,
   configureRateLimitStore,
@@ -94,16 +96,26 @@ test("memory rate limiter resets counts in a new window", async () => {
   assert.equal(third.remaining, 0);
 });
 
-test("resolveJwtSecrets allows development fallbacks", () => {
-  const secrets = resolveJwtSecrets({ NODE_ENV: "development" });
-  assert.equal(secrets.accessSecret, "dev-access-secret-change-me");
-  assert.equal(secrets.refreshSecret, "dev-refresh-secret-change-me");
+test("resolveJwtSecrets allows test-only fallbacks", () => {
+  const secrets = resolveJwtSecrets({ NODE_ENV: "test" });
+  assert.equal(typeof secrets.accessSecret, "string");
+  assert.equal(typeof secrets.refreshSecret, "string");
+  assert.ok(secrets.accessSecret.startsWith("test-access-"));
+  assert.ok(secrets.refreshSecret.startsWith("test-refresh-"));
 });
 
-test("resolveJwtSecrets requires explicit secrets in production", () => {
-  assert.throws(() => resolveJwtSecrets({ NODE_ENV: "production" }), /JWT_ACCESS_SECRET is required in production/);
+test("resolveJwtSecrets requires explicit secrets outside test", () => {
+  assert.throws(() => resolveJwtSecrets({ NODE_ENV: "development" }), /JWT_ACCESS_SECRET is required when NODE_ENV is not test/);
   assert.throws(
     () => resolveJwtSecrets({ NODE_ENV: "production", JWT_ACCESS_SECRET: "a" }),
-    /JWT_REFRESH_SECRET is required in production/,
+    /JWT_REFRESH_SECRET is required when NODE_ENV is not test/,
+  );
+  assert.throws(
+    () => resolveJwtSecrets({ NODE_ENV: "development", JWT_ACCESS_SECRET: "replace-with-strong-secret", JWT_REFRESH_SECRET: "b" }),
+    /JWT_ACCESS_SECRET must not use default placeholder values/,
+  );
+  assert.throws(
+    () => resolveJwtSecrets({ NODE_ENV: "development", JWT_ACCESS_SECRET: "a", JWT_REFRESH_SECRET: "replace-with-strong-secret" }),
+    /JWT_REFRESH_SECRET must not use default placeholder values/,
   );
 });

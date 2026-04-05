@@ -2,9 +2,26 @@ const fs = require("fs/promises");
 const path = require("path");
 const { MongoClient } = require("mongodb");
 
-const uri = process.env.MONGO_URI || "mongodb://mongodb:27017/homecareops";
-const MEDIA_UPLOAD_DIR = process.env.MEDIA_UPLOAD_DIR || "/data/uploads";
-const RETENTION_DAYS = 365;
+const DEFAULT_RETENTION_DAYS = 365;
+
+function toPositiveInt(value, fallback) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function getRetentionConfig(env = process.env) {
+  const uri = env.MONGO_URI || "mongodb://mongodb:27017/homecareops";
+  const mediaUploadDir = env.MEDIA_UPLOAD_DIR || "/data/uploads";
+  const retentionDays = toPositiveInt(env.RETENTION_CLEANUP_DAYS, DEFAULT_RETENTION_DAYS);
+  return {
+    uri,
+    mediaUploadDir,
+    retentionDays,
+  };
+}
 
 function parseDatabaseName(connectionUri) {
   try {
@@ -30,7 +47,7 @@ async function hasExternalMediaReferences(db, mediaId) {
   return Boolean(reviewRef || contentRef || ticketRef);
 }
 
-async function decrementAndMaybeDeleteMedia(db, mediaId) {
+async function decrementAndMaybeDeleteMedia({ db, mediaFs = fs, mediaUploadDir, mediaId }) {
   const media = await db.collection("media_metadata").findOne({ _id: mediaId });
   if (!media) {
     return { decremented: false, deletedBlob: false };
@@ -59,18 +76,19 @@ async function decrementAndMaybeDeleteMedia(db, mediaId) {
 
   await db.collection("media_metadata").deleteOne({ _id: mediaId });
   if (updated.storagePath) {
-    await fs.rm(path.join(MEDIA_UPLOAD_DIR, updated.storagePath), { force: true });
+    await mediaFs.rm(path.join(mediaUploadDir, updated.storagePath), { force: true });
   }
   return { decremented: true, deletedBlob: true };
 }
 
-async function main() {
-  const client = new MongoClient(uri);
+async function runRetentionCleanup({ logger = console, env = process.env, mediaFs = fs, mongoClientClass = MongoClient } = {}) {
+  const { mediaUploadDir, retentionDays, uri } = getRetentionConfig(env);
+  const client = new mongoClientClass(uri);
   await client.connect();
 
   try {
     const db = client.db(parseDatabaseName(uri));
-    const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
 
     const candidates = await db
       .collection("tickets")
@@ -92,7 +110,12 @@ async function main() {
       ];
 
       for (const mediaId of mediaIds) {
-        const result = await decrementAndMaybeDeleteMedia(db, mediaId);
+        const result = await decrementAndMaybeDeleteMedia({
+          db,
+          mediaFs,
+          mediaId,
+          mediaUploadDir,
+        });
         if (result.deletedBlob) {
           deletedBlobs += 1;
         }
@@ -112,15 +135,22 @@ async function main() {
       processedTickets += 1;
     }
 
-    console.log(
-      `retention cleanup completed: processed ${processedTickets} tickets, deleted ${deletedBlobs} blobs`,
-    );
+    logger.log(`retention cleanup completed: processed ${processedTickets} tickets, deleted ${deletedBlobs} blobs`);
+    return { deletedBlobs, processedTickets };
   } finally {
     await client.close();
   }
 }
 
-main().catch((error) => {
-  console.error(`retention cleanup failed: ${error.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  runRetentionCleanup().catch((error) => {
+    console.error(`retention cleanup failed: ${error.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  DEFAULT_RETENTION_DAYS,
+  getRetentionConfig,
+  runRetentionCleanup,
+};

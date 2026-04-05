@@ -144,6 +144,8 @@ function registerRoutes(deps) {
   const adminController = createAdminController({
     createError,
     getDatabase,
+    ObjectId,
+    writeAuditLog,
   });
 
   app.use(
@@ -173,6 +175,7 @@ function registerRoutes(deps) {
 
   const catalogController = createCatalogController({
     catalogService,
+    ObjectId,
   });
 
   app.use(
@@ -276,17 +279,38 @@ function registerRoutes(deps) {
     }),
   );
 
-  if (process.env.NODE_ENV === "development") {
+  if (process.env.INTERNAL_ROUTES_ENABLED === "true") {
+    if (process.env.NODE_ENV !== "test") {
+      throw new Error("INTERNAL_ROUTES_ENABLED=true is only allowed when NODE_ENV=test");
+    }
+
+    const internalRoutesToken = process.env.INTERNAL_ROUTES_TOKEN;
+    if (!internalRoutesToken) {
+      throw new Error("INTERNAL_ROUTES_ENABLED=true requires INTERNAL_ROUTES_TOKEN");
+    }
+
+    const requireInternalToken = (req, res, next) => {
+      const provided = req.headers["x-internal-token"];
+      if (typeof provided !== "string" || provided !== internalRoutesToken) {
+        return next(createError(403, "FORBIDDEN", "Internal route token required"));
+      }
+      return next();
+    };
+
     const internalController = createInternalController({
       createError,
       getDatabase,
       ObjectId,
+      writeAuditLog,
     });
 
     app.use(
       "/api/internal",
       createInternalRouter({
         controller: internalController,
+        requireAuth,
+        requireAdministrator,
+        requireInternalToken,
       }),
     );
   }

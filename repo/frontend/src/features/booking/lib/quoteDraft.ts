@@ -1,7 +1,7 @@
 import type { QuoteDraft, QuoteSpec } from '@/features/booking/store';
 
 export function buildQuotePayload(draft: QuoteDraft) {
-  if ((!draft.spec && !draft.lineItems?.length) || !draft.slotId || !draft.quoteSignature) {
+  if (!draft.spec && !draft.lineItems?.length) {
     return null;
   }
 
@@ -21,14 +21,14 @@ export function buildQuotePayload(draft: QuoteDraft) {
 
   return {
     lineItems,
-    slotId: draft.slotId,
+    slotId: draft.slotId || undefined,
     bookingRequestedAt: draft.bookingRequestedAt || undefined,
     slotStart: draft.slotStart || undefined,
     milesFromDepot: draft.milesFromDepot ?? undefined,
     jurisdictionId: draft.jurisdictionId || undefined,
     sameDayPriority: Boolean(draft.sameDayPriority),
     taxEnabled: draft.taxEnabled,
-    quoteSignature: draft.quoteSignature,
+    quoteSignature: draft.quoteSignature || undefined,
     spec: draft.spec,
   };
 }

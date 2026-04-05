@@ -1,6 +1,8 @@
 #!/bin/sh
 
 base_url="${API_BASE_URL:-http://api:4000}"
+internal_token="${INTERNAL_ROUTES_TOKEN:-dev-internal-token}"
+internal_admin_token="${INTERNAL_ADMIN_TOKEN:-}"
 
 customer_login_code=$(curl -sS -o /tmp/ticket_mod_customer_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
   -H "Content-Type: application/json" \
@@ -12,7 +14,9 @@ moderator_login_code=$(curl -sS -o /tmp/ticket_mod_moderator_login.json -w "%{ht
   -H "X-Device-Id: ticket-mod-moderator-device" \
   -d '{"username":"moderator_demo","password":"devpass123456"}')
 
-fixture_code=$(curl -sS -o /tmp/ticket_mod_fixture.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order")
+fixture_code=$(curl -sS -o /tmp/ticket_mod_fixture.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order" \
+  -H "X-Internal-Token: $internal_token" \
+  -H "Authorization: Bearer $internal_admin_token")
 
 if [ "$customer_login_code" != "200" ] || [ "$moderator_login_code" != "200" ] || [ "$fixture_code" != "201" ]; then
   exit 1

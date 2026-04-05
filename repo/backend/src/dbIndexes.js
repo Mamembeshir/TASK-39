@@ -48,6 +48,9 @@ async function ensureIndexes(database) {
     .collection("content_versions")
     .createIndex({ "versions.mediaRefs": 1 }, { name: "idx_content_version_media_refs" });
   await database
+    .collection("content_versions")
+    .createIndex({ status: 1, scheduledPublishAt: 1 }, { name: "idx_content_scheduled_publish_due" });
+  await database
     .collection("search_documents")
     .createIndex({ type: 1, sourceId: 1 }, { unique: true, name: "uniq_search_doc" });
   await database.collection("search_documents").createIndex({ searchText: "text" }, { name: "txt_search_documents" });

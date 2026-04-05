@@ -1,3 +1,5 @@
+const { logger } = require("../../utils/logger");
+
 function createSlotService({ getDatabase }) {
   async function releaseSlotCapacity(slotIds) {
     if (!Array.isArray(slotIds) || slotIds.length === 0) {
@@ -83,7 +85,7 @@ function createSlotService({ getDatabase }) {
     const intervalMs = 60 * 1000;
     setInterval(() => {
       releaseExpiredPendingOrders().catch((error) => {
-        console.error(`Pending order release worker failed: ${error.message}`);
+        logger.error({ err: error }, "Pending order release worker failed");
       });
     }, intervalMs);
   }

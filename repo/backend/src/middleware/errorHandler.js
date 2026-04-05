@@ -44,7 +44,7 @@ function errorHandler(err, req, res, next) {
     message: mapped.message,
   };
 
-  if (mapped.details) {
+  if (mapped.details && mapped.httpStatus < 500) {
     payload.details = mapped.details;
   }
 

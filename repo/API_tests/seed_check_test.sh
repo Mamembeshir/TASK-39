@@ -2,7 +2,11 @@
 
 response_file="/tmp/seed_check_response.json"
 base_url="${API_BASE_URL:-http://api:4000}"
-http_code=$(curl -sS -o "$response_file" -w "%{http_code}" "$base_url/api/internal/seed-check")
+internal_token="${INTERNAL_ROUTES_TOKEN:-dev-internal-token}"
+internal_admin_token="${INTERNAL_ADMIN_TOKEN:-}"
+http_code=$(curl -sS -o "$response_file" -w "%{http_code}" "$base_url/api/internal/seed-check" \
+  -H "X-Internal-Token: $internal_token" \
+  -H "Authorization: Bearer $internal_admin_token")
 
 if [ "$http_code" != "200" ]; then
   exit 1

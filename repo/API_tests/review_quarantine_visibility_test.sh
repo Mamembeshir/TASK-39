@@ -1,6 +1,8 @@
 #!/bin/sh
 
 base_url="${API_BASE_URL:-http://api:4000}"
+internal_token="${INTERNAL_ROUTES_TOKEN:-dev-internal-token}"
+internal_admin_token="${INTERNAL_ADMIN_TOKEN:-}"
 service_id="65f000000000000000000101"
 
 login_code=$(curl -sS -o /tmp/review_quarantine_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
@@ -14,7 +16,9 @@ fi
 
 token=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!p.accessToken) process.exit(1);process.stdout.write(p.accessToken);' /tmp/review_quarantine_login.json)
 
-fixture_code=$(curl -sS -o /tmp/review_quarantine_fixture.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order")
+fixture_code=$(curl -sS -o /tmp/review_quarantine_fixture.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order" \
+  -H "X-Internal-Token: $internal_token" \
+  -H "Authorization: Bearer $internal_admin_token")
 if [ "$fixture_code" != "201" ]; then
   exit 1
 fi

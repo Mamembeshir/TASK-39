@@ -73,8 +73,10 @@ function createContentController(deps) {
       try {
         const contentId = contentService.parseContentIdOrThrow(req.params.id);
         const result = await contentService.publishContentById({
+          auth: req.auth,
           body: req.body,
           contentId,
+          req,
         });
         return res.status(200).json(result);
       } catch (error) {
@@ -96,8 +98,10 @@ function createContentController(deps) {
       try {
         const contentId = contentService.parseContentIdOrThrow(req.params.id);
         const result = await contentService.rollbackContentById({
+          auth: req.auth,
           body: req.body,
           contentId,
+          req,
         });
         return res.status(200).json(result);
       } catch (error) {

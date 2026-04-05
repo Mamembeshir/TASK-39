@@ -2,7 +2,11 @@
 
 response_file="/tmp/unique_username_response.json"
 base_url="${API_BASE_URL:-http://api:4000}"
-http_code=$(curl -sS -X POST -o "$response_file" -w "%{http_code}" "$base_url/api/internal/constraints/users-username")
+internal_token="${INTERNAL_ROUTES_TOKEN:-dev-internal-token}"
+internal_admin_token="${INTERNAL_ADMIN_TOKEN:-}"
+http_code=$(curl -sS -X POST -o "$response_file" -w "%{http_code}" "$base_url/api/internal/constraints/users-username" \
+  -H "X-Internal-Token: $internal_token" \
+  -H "Authorization: Bearer $internal_admin_token")
 
 if [ "$http_code" != "200" ]; then
   exit 1

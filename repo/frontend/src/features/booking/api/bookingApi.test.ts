@@ -19,6 +19,7 @@ vi.mock('@/features/catalog/api/catalogApi', () => ({
 import {
   addFavorite,
   getCompare,
+  getCompareIds,
   listFavorites,
   listQuoteJurisdictions,
   listQuoteSlots,
@@ -69,6 +70,50 @@ describe('bookingApi', () => {
     });
   });
 
+  it('quote normalizes backend totals contract to frontend shape', async () => {
+    requestMock.mockResolvedValue({
+      totals: {
+        total: 145,
+        subtotalBeforeTax: 133.33,
+        tax: 11.67,
+        travelFee: 10,
+        sameDaySurcharge: 25,
+      },
+      itemizedLines: [
+        { serviceId: 'svc-1', lineTotal: 120 },
+      ],
+      quoteSignature: 'sig-1',
+      notServiceable: false,
+    });
+
+    await expect(quote({
+      lineItems: [{ type: 'service', serviceId: 'svc-1', durationMinutes: 60, quantity: 1 }],
+    })).resolves.toEqual({
+      totals: {
+        total: 145,
+        subtotalBeforeTax: 133.33,
+        tax: 11.67,
+        travelFee: 10,
+        sameDaySurcharge: 25,
+      },
+      itemizedLines: [
+        { serviceId: 'svc-1', lineTotal: 120 },
+      ],
+      quoteSignature: 'sig-1',
+      notServiceable: false,
+      total: 145,
+      subtotal: 133.33,
+      tax: 11.67,
+      travelFee: 10,
+      sameDaySurcharge: 25,
+      taxBreakdown: [
+        { label: 'Subtotal', amount: 133.33 },
+        { label: 'Tax', amount: 11.67 },
+      ],
+      lineItems: [{ serviceId: 'svc-1', bundleId: undefined, amount: 120 }],
+    });
+  });
+
   it('listQuoteSlots and listQuoteJurisdictions normalize arrays', async () => {
     requestMock
       .mockResolvedValueOnce({ slots: [{ slotId: 'slot-1', startTime: 't', remainingCapacity: 1 }] })
@@ -101,13 +146,15 @@ describe('bookingApi', () => {
     await expect(getCompare()).resolves.toEqual([{ id: 'svc-1', title: 'One' }]);
   });
 
-  it('setCompare persists ids and reloads compare details', async () => {
-    requestMock
-      .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({ serviceIds: ['svc-1'] });
-    getServiceMock.mockResolvedValue({ id: 'svc-1', title: 'One' });
+  it('getCompareIds returns normalized ids', async () => {
+    requestMock.mockResolvedValue({ serviceIds: ['svc-1', 'svc-2', 'svc-3', 'svc-4', 'svc-5', 'svc-6'] });
+    await expect(getCompareIds()).resolves.toEqual(['svc-1', 'svc-2', 'svc-3', 'svc-4', 'svc-5']);
+  });
 
-    await expect(setCompare(['svc-1'])).resolves.toEqual([{ id: 'svc-1', title: 'One' }]);
+  it('setCompare persists ids and returns canonical id list', async () => {
+    requestMock.mockResolvedValueOnce({ serviceIds: ['svc-1'] });
+
+    await expect(setCompare(['svc-1'])).resolves.toEqual(['svc-1']);
     expect(requestMock).toHaveBeenNthCalledWith(1, {
       method: 'PUT',
       path: '/api/compare',

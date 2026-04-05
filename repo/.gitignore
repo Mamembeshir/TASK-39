@@ -4,3 +4,39 @@ frontend/node_modules/
 dist/
 coverage/
 *.log
+
+# environment / secrets
+.env
+.env.*
+!.env.example
+
+# editor / local tooling
+.vscode/
+.idea/
+.opencode/
+.codex/
+
+# python caches
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+
+# dotnet / other build artifacts
+bin/
+obj/
+
+# local runtime/cache
+.cache/
+.tmp/
+tmp/
+*.pid
+
+# local database artifacts
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+dump/
+mongo-data/

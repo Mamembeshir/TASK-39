@@ -69,3 +69,33 @@ test("createReview rejects expired review windows", async () => {
     (error) => error && error.code === 'REVIEW_WINDOW_EXPIRED',
   );
 });
+
+test("createReview rejects media not owned by requester", async () => {
+  const service = createReviewsService({
+    ...baseDeps,
+    reviewsRepository: {
+      findSettings: async () => ({ organizationTimezone: 'America/Los_Angeles', sensitiveTerms: [] }),
+      findOrderById: async () => ({
+        state: 'completed',
+        completedAt: new Date(),
+        customerId: { toString: () => 'u1' },
+        lineItems: [],
+      }),
+      findMediaByIds: async () => [
+        { _id: 'm1', purpose: 'review', mime: 'image/png', byteSize: 128, createdBy: { toString: () => 'u2' } },
+      ],
+      findBundlesByIds: async () => [],
+      insertReview: async () => {
+        throw new Error('should not insert review');
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => service.createReview({
+      auth: { sub: 'u1' },
+      body: { orderId: 'ord-1', rating: 5, tags: ['kind'], text: 'okay', mediaIds: ['m1'] },
+    }),
+    (error) => error && error.code === 'MEDIA_FORBIDDEN' && error.status === 403,
+  );
+});

@@ -181,7 +181,7 @@ function createCatalogService(deps) {
       };
     },
 
-    publishServiceQuestionById: async ({ id, body, auth, ObjectId }) => {
+    publishServiceQuestionById: async ({ id, body, auth, ObjectId, req }) => {
       const questionId = parseObjectIdOrNull(id);
       if (!questionId) {
         throw createError(400, "INVALID_QUESTION_ID", "Question id is invalid");
@@ -204,10 +204,22 @@ function createCatalogService(deps) {
         updatedAt: new Date(),
       });
 
+      await writeAuditLog({
+        username: auth?.username,
+        userId: auth?.sub ? new ObjectId(auth.sub) : null,
+        action: "catalog.service_question.publish",
+        outcome: "success",
+        req,
+        details: {
+          questionId: questionId.toString(),
+          serviceId: question.serviceId?.toString?.() || null,
+        },
+      });
+
       return { id: questionId.toString(), status: "published" };
     },
 
-    rejectServiceQuestionById: async ({ id }) => {
+    rejectServiceQuestionById: async ({ id, auth, ObjectId, req }) => {
       const questionId = parseObjectIdOrNull(id);
       if (!questionId) {
         throw createError(400, "INVALID_QUESTION_ID", "Question id is invalid");
@@ -221,6 +233,18 @@ function createCatalogService(deps) {
       await catalogRepository.updateServiceQuestionById(questionId, {
         status: "rejected",
         updatedAt: new Date(),
+      });
+
+      await writeAuditLog({
+        username: auth?.username,
+        userId: auth?.sub ? new ObjectId(auth.sub) : null,
+        action: "catalog.service_question.reject",
+        outcome: "success",
+        req,
+        details: {
+          questionId: questionId.toString(),
+          serviceId: question.serviceId?.toString?.() || null,
+        },
       });
 
       return { id: questionId.toString(), status: "rejected" };
@@ -246,7 +270,7 @@ function createCatalogService(deps) {
       };
     },
 
-    createService: async ({ body }) => {
+    createService: async ({ auth, body, req }) => {
       const normalized = normalizeServicePayload(body || {}, { partial: false });
       if (!normalized.ok) {
         throw createError(400, "INVALID_SPEC", normalized.errors.join("; "));
@@ -262,10 +286,23 @@ function createCatalogService(deps) {
 
       const result = await catalogRepository.insertService(toInsert);
       await syncServiceSearchDocument(result.insertedId);
+
+      await writeAuditLog({
+        username: auth?.username,
+        userId: auth?.sub ? new ObjectId(auth.sub) : null,
+        action: "catalog.service.create",
+        outcome: "success",
+        req,
+        details: {
+          serviceId: result.insertedId.toString(),
+          category: toInsert.category || null,
+        },
+      });
+
       return { id: result.insertedId.toString() };
     },
 
-    updateServiceById: async ({ id, body }) => {
+    updateServiceById: async ({ auth, id, body, req }) => {
       const serviceId = parseObjectIdOrNull(id);
       if (!serviceId) {
         throw createError(400, "INVALID_SERVICE_ID", "Service id is invalid");
@@ -288,6 +325,19 @@ function createCatalogService(deps) {
       }
 
       await syncServiceSearchDocument(serviceId);
+
+      await writeAuditLog({
+        username: auth?.username,
+        userId: auth?.sub ? new ObjectId(auth.sub) : null,
+        action: "catalog.service.update",
+        outcome: "success",
+        req,
+        details: {
+          serviceId: serviceId.toString(),
+          fields: Object.keys(normalized.document),
+        },
+      });
+
       return { status: "ok" };
     },
 
@@ -341,7 +391,7 @@ function createCatalogService(deps) {
       return { status: "ok" };
     },
 
-    createBundle: async ({ body }) => {
+    createBundle: async ({ auth, body, req }) => {
       const normalized = normalizeBundlePayload(body || {}, { partial: false });
       if (!normalized.ok) {
         throw createError(400, "INVALID_BUNDLE", normalized.errors.join("; "));
@@ -356,10 +406,23 @@ function createCatalogService(deps) {
       };
 
       const result = await catalogRepository.insertBundle(toInsert);
+
+      await writeAuditLog({
+        username: auth?.username,
+        userId: auth?.sub ? new ObjectId(auth.sub) : null,
+        action: "catalog.bundle.create",
+        outcome: "success",
+        req,
+        details: {
+          bundleId: result.insertedId.toString(),
+          serviceCount: Array.isArray(toInsert.serviceIds) ? toInsert.serviceIds.length : 0,
+        },
+      });
+
       return { id: result.insertedId.toString() };
     },
 
-    updateBundleById: async ({ id, body }) => {
+    updateBundleById: async ({ auth, id, body, req }) => {
       const bundleId = parseObjectIdOrNull(id);
       if (!bundleId) {
         throw createError(400, "INVALID_BUNDLE_ID", "Bundle id is invalid");
@@ -380,6 +443,18 @@ function createCatalogService(deps) {
       if (result.matchedCount === 0) {
         throw createError(404, "BUNDLE_NOT_FOUND", "Bundle not found");
       }
+
+      await writeAuditLog({
+        username: auth?.username,
+        userId: auth?.sub ? new ObjectId(auth.sub) : null,
+        action: "catalog.bundle.update",
+        outcome: "success",
+        req,
+        details: {
+          bundleId: bundleId.toString(),
+          fields: Object.keys(normalized.document),
+        },
+      });
 
       return { status: "ok" };
     },

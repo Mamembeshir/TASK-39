@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { logger } = require('../utils/logger');
 
 function createAuthController(deps) {
   const { authService, createError, getDatabase, getDeviceFingerprint, writeAuditLog, assessLoginRisk, ObjectId } = deps;
@@ -104,7 +105,7 @@ function createAuthController(deps) {
             hasUserAgent: Boolean(req.headers['user-agent']),
           });
         } catch (error) {
-          console.error(`Non-blocking new-device logging failed: ${error.message}`);
+          logger.error({ err: error, username }, 'Non-blocking new-device logging failed');
         }
 
         setAuthCookies(res, accessToken, refreshToken);

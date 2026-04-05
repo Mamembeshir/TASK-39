@@ -1,5 +1,5 @@
 function createAdminController(deps) {
-  const { createError, getDatabase } = deps;
+  const { createError, getDatabase, ObjectId, writeAuditLog } = deps;
 
   return {
     listAuditLogs: async (req, res, next) => {
@@ -41,6 +41,16 @@ function createAdminController(deps) {
           { $set: { active, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
           { upsert: true },
         );
+
+        await writeAuditLog({
+          username: req.auth?.username,
+          userId: req.auth?.sub ? new ObjectId(req.auth.sub) : null,
+          action: 'admin.blacklist.upsert',
+          outcome: 'success',
+          req,
+          details: { type, value, active },
+        });
+
         return res.status(200).json({ status: 'ok' });
       } catch (error) {
         return next(error);

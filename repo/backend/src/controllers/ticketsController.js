@@ -60,6 +60,7 @@ function createTicketsController(deps) {
 
         const result = await ticketsService.updateTicketStatus({
           auth: req.auth,
+          req,
           status,
           ticketId,
         });
@@ -78,7 +79,7 @@ function createTicketsController(deps) {
         }
 
         const legalHold = Boolean(req.body?.legalHold);
-        const result = await ticketsService.setTicketLegalHold({ legalHold, ticketId });
+        const result = await ticketsService.setTicketLegalHold({ auth: req.auth, legalHold, req, ticketId });
         return res.status(200).json(result);
       } catch (error) {
         return next(error);

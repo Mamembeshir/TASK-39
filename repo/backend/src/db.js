@@ -8,6 +8,7 @@
 const { MongoClient } = require("mongodb");
 const { ensureIndexes } = require("./dbIndexes");
 const { seedDatabase } = require("./dbSeedFixtures");
+const { rebuildSearchDocuments } = require("./dbSearchDocuments");
 
 const DEFAULT_URI = "mongodb://mongodb:27017/homecareops";
 const DEFAULT_DB_NAME = "homecareops";
@@ -33,75 +34,41 @@ function parseDatabaseName(uri) {
   }
 }
 
-async function rebuildSearchDocuments(database) {
-  const now = new Date();
-  const docs = [];
-
-  const services = await database.collection("services").find({ published: true }).toArray();
-  for (const service of services) {
-    docs.push({
-      type: "service",
-      sourceId: service._id,
-      title: service.title,
-      body: service.description,
-      tags: service.tags || [],
-      searchText: [service.title, service.description, ...(service.tags || [])].filter(Boolean).join(" "),
-      publishAt: service.updatedAt || now,
-      createdAt: now,
-      updatedAt: now,
-    });
+function toBoolean(value, defaultValue = false) {
+  if (value === undefined || value === null || value === "") {
+    return defaultValue;
   }
-
-  const contents = await database
-    .collection("content_versions")
-    .find({
-      status: "published",
-      publishedVersionId: { $ne: null },
-    })
-    .toArray();
-
-  for (const content of contents) {
-    const published = (content.versions || []).find(
-      (version) => version.id && version.id.toString() === content.publishedVersionId.toString(),
-    );
-    if (!published) {
-      continue;
-    }
-
-    docs.push({
-      type: "content",
-      sourceId: content._id,
-      title: published.title,
-      body: published.body,
-      tags: [content.slug],
-      searchText: [content.slug, published.title, published.body].filter(Boolean).join(" "),
-      publishAt: content.publishedAt || now,
-      createdAt: now,
-      updatedAt: now,
-    });
-  }
-
-  await database.collection("search_documents").deleteMany({});
-  if (docs.length > 0) {
-    await database.collection("search_documents").insertMany(docs);
-  }
+  return String(value).toLowerCase() === "true";
 }
 
 async function initializeDatabase() {
   const uri = process.env.MONGO_URI || DEFAULT_URI;
+  const nodeEnv = process.env.NODE_ENV || "development";
+  const seedFixtures = toBoolean(process.env.SEED_FIXTURES, false);
+
+  if (nodeEnv === "production" && seedFixtures) {
+    throw new Error("SEED_FIXTURES=true is not allowed in production");
+  }
+
   const dbName = parseDatabaseName(uri);
   client = new MongoClient(uri);
   await client.connect();
   db = client.db(dbName);
   await ensureIndexes(db);
-  await seedDatabase(db);
+  if (seedFixtures) {
+    await seedDatabase(db);
+  }
   await rebuildSearchDocuments(db);
 }
 
 async function connectWithRetry() {
   try {
     await initializeDatabase();
-    console.log("Connected to MongoDB, indexes ensured, seed data upserted");
+    if (toBoolean(process.env.SEED_FIXTURES, false)) {
+      console.log("Connected to MongoDB, indexes ensured, seed fixtures upserted");
+    } else {
+      console.log("Connected to MongoDB, indexes ensured");
+    }
   } catch (error) {
     console.error(`MongoDB initialization failed: ${error.message}`);
     await new Promise((resolve) => {

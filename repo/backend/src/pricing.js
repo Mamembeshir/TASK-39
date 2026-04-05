@@ -265,11 +265,27 @@ function calculateQuote({
   const taxRate = effectiveTaxEnabled ? Number(jurisdiction?.taxRate || 0) : 0;
   const tax = subtotalBeforeTax * taxRate;
   const total = subtotalBeforeTax + tax;
+  const taxBreakdown = [
+    { label: "Subtotal", amount: subtotalBeforeTax },
+    { label: "Tax", amount: tax },
+  ];
+  const normalizedLineItems = itemizedLines.map((line) => ({
+    serviceId: line.serviceId,
+    bundleId: line.bundleId,
+    amount: Number(line.lineTotal || 0),
+  }));
 
   return {
     notServiceable: false,
     code: "OK",
     itemizedLines,
+    lineItems: normalizedLineItems,
+    subtotal: subtotalBeforeTax,
+    tax,
+    travelFee,
+    sameDaySurcharge,
+    total,
+    taxBreakdown,
     travel: {
       milesFromDepot,
       band: travelBand.label,

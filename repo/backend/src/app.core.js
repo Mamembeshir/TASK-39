@@ -76,6 +76,8 @@ const { createAppError } = require("./errors/appError");
 const { requestLogger } = require("./utils/logger");
 const { createNetworkServer } = require("./utils/tlsServer");
 const { startSearchCleanupScheduler } = require("./workers/searchCleanupScheduler");
+const { startScheduledContentPublishWorker } = require("./workers/contentPublishScheduler");
+const { startRetentionCleanupScheduler } = require("./workers/retentionCleanupScheduler");
 const {
   buildContentVersion,
   parseObjectIdArray,
@@ -129,7 +131,7 @@ app.use(
 );
 app.use(validateRequestShape);
 app.use(requireCsrf);
-app.use("/media/files", express.static(MEDIA_UPLOAD_DIR, { index: false, fallthrough: false }));
+app.use("/media/files", express.static(`${MEDIA_UPLOAD_DIR}/public`, { index: false, fallthrough: true }));
 
 function createError(status, code, message) {
   return createAppError(code, status, message);
@@ -206,9 +208,11 @@ const ticketsService = createTicketsService({
   assertCanAccessTicket,
   computeSlaDeadlines,
   createError,
+  ObjectId,
   SLA_FIRST_RESPONSE_MINUTES,
   SLA_RESOLUTION_MINUTES,
   ticketsRepository,
+  writeAuditLog,
 });
 
 const inboxService = createInboxService({
@@ -333,6 +337,8 @@ async function startServer() {
   await connectWithRetry();
   startPendingOrderReleaseWorker();
   startSearchCleanupScheduler();
+  startRetentionCleanupScheduler();
+  startScheduledContentPublishWorker({ contentRepository, syncContentSearchDocument });
   const { protocol } = await createNetworkServer({
     app,
     fs,

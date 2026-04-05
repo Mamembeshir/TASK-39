@@ -123,6 +123,50 @@ async function rollbackVersion(contentId, versionId, mediaRefs = []) {
   );
 }
 
+async function publishNextDueScheduledContent(now = new Date()) {
+  const database = getDatabase();
+  const dueContent = await database.collection("content_versions").findOne(
+    {
+      status: "scheduled",
+      scheduledPublishAt: { $lte: now },
+      scheduledVersionId: { $ne: null },
+    },
+    { sort: { scheduledPublishAt: 1, updatedAt: 1 } },
+  );
+
+  if (!dueContent || !dueContent.scheduledVersionId) {
+    return null;
+  }
+
+  const publishResult = await database.collection("content_versions").updateOne(
+    {
+      _id: dueContent._id,
+      status: "scheduled",
+      scheduledVersionId: dueContent.scheduledVersionId,
+      scheduledPublishAt: dueContent.scheduledPublishAt,
+    },
+    {
+      $set: {
+        publishedVersionId: dueContent.scheduledVersionId,
+        status: "published",
+        scheduledPublishAt: null,
+        scheduledVersionId: null,
+        publishedAt: now,
+        updatedAt: now,
+      },
+    },
+  );
+
+  if (publishResult.modifiedCount === 0) {
+    return null;
+  }
+
+  return {
+    id: dueContent._id,
+    publishedVersionId: dueContent.scheduledVersionId,
+  };
+}
+
 module.exports = {
   findContentById,
   findAllContentSummaries,
@@ -130,6 +174,7 @@ module.exports = {
   findPublishedContentSummaries,
   insertContent,
   publishVersion,
+  publishNextDueScheduledContent,
   pushDraftVersion,
   rollbackVersion,
   updateSchedule,

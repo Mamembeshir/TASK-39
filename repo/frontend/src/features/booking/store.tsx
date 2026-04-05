@@ -1,10 +1,11 @@
 import type { PropsWithChildren } from 'react';
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { QuoteLineItem } from '@/features/booking/api/bookingApi';
+import { getCompareIds, setCompare } from '@/features/booking/api/bookingApi';
 
 type BookingState = {
   compareIds: string[];
-  toggleCompare: (id: string) => void;
+  toggleCompare: (id: string) => Promise<void>;
   setCompareIds: (ids: string[]) => void;
   quoteDraft: QuoteDraft;
   setQuoteDraft: (draft: QuoteDraft) => void;
@@ -33,6 +34,16 @@ export type QuoteDraft = {
 
 const BookingContext = createContext<BookingState | null>(null);
 
+function nextCompareIds(current: string[], id: string) {
+  if (current.includes(id)) {
+    return current.filter((item) => item !== id);
+  }
+  if (current.length >= 5) {
+    return current;
+  }
+  return [...current, id];
+}
+
 export function BookingProvider({ children }: PropsWithChildren) {
   const [compareIds, setCompareIdsState] = useState<string[]>([]);
   const [quoteDraft, setQuoteDraft] = useState<QuoteDraft>({
@@ -48,13 +59,41 @@ export function BookingProvider({ children }: PropsWithChildren) {
     taxEnabled: true,
   });
 
+  useEffect(() => {
+    let cancelled = false;
+    getCompareIds()
+      .then((ids) => {
+        if (!cancelled) {
+          setCompareIdsState(ids);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCompareIdsState([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggleCompare = useCallback(async (id: string) => {
+    const desired = nextCompareIds(compareIds, id);
+    if (desired.length === compareIds.length && desired.every((item, index) => item === compareIds[index])) {
+      return;
+    }
+    const persistedIds = await setCompare(desired);
+    setCompareIdsState(persistedIds);
+  }, [compareIds]);
+
   const value = useMemo<BookingState>(() => ({
     compareIds,
-    toggleCompare: (id) => setCompareIdsState((current) => current.includes(id) ? current.filter((item) => item !== id) : current.length >= 5 ? current : [...current, id]),
+    toggleCompare,
     setCompareIds: setCompareIdsState,
     quoteDraft,
     setQuoteDraft,
-  }), [compareIds, quoteDraft]);
+  }), [compareIds, quoteDraft, toggleCompare]);
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
 }

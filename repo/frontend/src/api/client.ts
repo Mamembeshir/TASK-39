@@ -31,8 +31,12 @@ function toApiError(error: unknown, fallbackCode: string, fallbackMessage: strin
   if (isObject(error)) {
     const code = typeof error.code === 'string' ? error.code : fallbackCode;
     const message = typeof error.message === 'string' ? error.message : fallbackMessage;
-    const details = 'details' in error ? error.details : undefined;
-    return { code, message, details };
+    return {
+      ...error,
+      code,
+      message,
+      details: 'details' in error ? error.details : undefined,
+    };
   }
 
   return { code: fallbackCode, message: fallbackMessage };

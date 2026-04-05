@@ -16,6 +16,8 @@ export function OrderDetailPage() {
   if (orderQuery.isError) return <PageShell width="narrow"><Card><CardHeader><CardTitle>Unable to load order</CardTitle></CardHeader><CardContent><p className="body-base">Please try again in a moment.</p></CardContent></Card></PageShell>;
   if (!orderQuery.data) return null;
 
+  const isCompleted = orderQuery.data.status === 'completed';
+
   return (
     <PageShell width="narrow">
       <div className="grid gap-6">
@@ -25,6 +27,11 @@ export function OrderDetailPage() {
           <CardContent className="grid gap-3">
             <p className="body-base">Status: {orderQuery.data.status}</p>
             <p className="body-base">Total: {orderQuery.data.total}</p>
+            {isCompleted && (
+              <Button variant="secondary" onClick={() => navigate(`/orders/${orderQuery.data.id}/review`)}>
+                Leave review
+              </Button>
+            )}
             <Button onClick={() => navigate(`/tickets/new?orderId=${orderQuery.data.id}`)}>Open ticket</Button>
           </CardContent>
         </Card>

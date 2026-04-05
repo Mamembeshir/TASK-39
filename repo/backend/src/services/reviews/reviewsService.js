@@ -14,6 +14,23 @@ function createReviewsService(deps) {
     writeAuditLog,
   } = deps;
 
+  function isMediaOwnedByActor(media, actorId) {
+    if (!actorId || !media) {
+      return false;
+    }
+
+    const createdBy = media.createdBy?.toString?.() || null;
+    if (createdBy && createdBy === actorId) {
+      return true;
+    }
+
+    if (Array.isArray(media.ownerIds)) {
+      return media.ownerIds.some((ownerId) => (ownerId?.toString?.() || String(ownerId)) === actorId);
+    }
+
+    return false;
+  }
+
   return {
     createReview: async ({ auth, body }) => {
       const { orderId, rating, tags, text, mediaIds } = body || {};
@@ -67,6 +84,10 @@ function createReviewsService(deps) {
       const mediaDocs = await reviewsRepository.findMediaByIds(parsedMediaIds);
       if (mediaDocs.length !== parsedMediaIds.length) {
         throw createError(400, "MEDIA_NOT_FOUND", "One or more media files were not found");
+      }
+      const actorId = auth?.sub || auth?.userId || null;
+      if (mediaDocs.some((media) => !isMediaOwnedByActor(media, actorId))) {
+        throw createError(403, "MEDIA_FORBIDDEN", "One or more media files are not owned by requester");
       }
       for (const media of mediaDocs) {
         if (media.purpose !== "review") {

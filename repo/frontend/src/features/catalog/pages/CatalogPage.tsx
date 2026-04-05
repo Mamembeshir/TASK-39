@@ -10,12 +10,13 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { Pagination } from '@/shared/components/ui/pagination';
 import { AppLoader } from '@/shared/components/AppLoader';
 
-const categoryOptions = [
-  { value: '', label: 'All categories' },
-  { value: 'care_support', label: 'Care & support' },
-  { value: 'home_assistance', label: 'Home assistance' },
-  { value: 'medical_help', label: 'Medical help' },
-];
+function formatCategoryLabel(category: string) {
+  return category
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
+    .join(' ');
+}
 
 export function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -28,6 +29,21 @@ export function CatalogPage() {
     queryKey: ['catalog', category, tags],
     queryFn: () => listServices({ category: category || undefined, tags: tags || undefined }),
   });
+  const categoriesQuery = useQuery({
+    queryKey: ['catalog-categories'],
+    queryFn: () => listServices(),
+  });
+
+  const categoryOptions = useMemo(() => {
+    const categories = Array.from(
+      new Set((categoriesQuery.data ?? []).map((service) => service.category).filter((value): value is string => Boolean(value))),
+    ).sort();
+
+    return [
+      { value: '', label: 'All categories' },
+      ...categories.map((value) => ({ value, label: formatCategoryLabel(value) })),
+    ];
+  }, [categoriesQuery.data]);
 
   const tagValue = useMemo(() => tags, [tags]);
   const services = Array.isArray(servicesQuery.data) ? servicesQuery.data : [];

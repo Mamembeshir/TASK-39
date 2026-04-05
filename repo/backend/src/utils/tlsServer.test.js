@@ -3,10 +3,10 @@ const assert = require("node:assert/strict");
 
 const { createNetworkServer, resolveTlsEnabled } = require("./tlsServer");
 
-test("resolveTlsEnabled defaults to true in production", () => {
+test("resolveTlsEnabled defaults to true in all environments", () => {
   assert.equal(resolveTlsEnabled({ NODE_ENV: "production" }), true);
-  assert.equal(resolveTlsEnabled({ NODE_ENV: "development" }), false);
-  assert.equal(resolveTlsEnabled({ NODE_ENV: "test" }), false);
+  assert.equal(resolveTlsEnabled({ NODE_ENV: "development" }), true);
+  assert.equal(resolveTlsEnabled({ NODE_ENV: "test" }), true);
 });
 
 test("resolveTlsEnabled explicit flag overrides environment default", () => {

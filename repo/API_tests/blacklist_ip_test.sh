@@ -2,9 +2,13 @@
 
 base_url="${API_BASE_URL:-http://api:4000}"
 blocked_ip="203.0.113.77"
+internal_token="${INTERNAL_ROUTES_TOKEN:-dev-internal-token}"
+internal_admin_token="${INTERNAL_ADMIN_TOKEN:-}"
 
 fixture_code=$(curl -sS -o /tmp/blacklist_fixture.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/blacklist-ip" \
   -H "Content-Type: application/json" \
+  -H "X-Internal-Token: $internal_token" \
+  -H "Authorization: Bearer $internal_admin_token" \
   -d "{\"ip\":\"$blocked_ip\"}")
 
 if [ "$fixture_code" != "200" ]; then

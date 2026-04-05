@@ -92,10 +92,6 @@ export const router = createBrowserRouter([
             element: <SearchPage />,
           },
           {
-            path: 'inbox',
-            element: <InboxPage />,
-          },
-          {
             element: <ProtectedRoute />,
             children: [
               {
@@ -133,6 +129,10 @@ export const router = createBrowserRouter([
               {
                 path: 'tickets/:id',
                 element: <TicketDetailPage />,
+              },
+              {
+                path: 'inbox',
+                element: <InboxPage />,
               },
               {
                 path: 'mod/reviews',

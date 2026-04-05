@@ -9,6 +9,40 @@ function createOrdersService(deps) {
     releaseSlotCapacity,
   } = deps;
 
+  function extractRequestedServiceIds(lineItems = []) {
+    const ids = [];
+    const seen = new Set();
+
+    const pushUnique = (value) => {
+      const normalized = String(value);
+      if (seen.has(normalized)) {
+        return;
+      }
+      seen.add(normalized);
+      ids.push(normalized);
+    };
+
+    for (const item of lineItems) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+
+      if (item.type === "service" && item.serviceId) {
+        pushUnique(item.serviceId);
+      }
+
+      if (item.type === "bundle" && Array.isArray(item.specs)) {
+        for (const spec of item.specs) {
+          if (spec?.serviceId) {
+            pushUnique(spec.serviceId);
+          }
+        }
+      }
+    }
+
+    return ids;
+  }
+
   async function listCapacitySlots() {
     const slots = await ordersRepository.listCapacitySlots();
     return slots.map((slot) => ({
@@ -87,6 +121,29 @@ function createOrdersService(deps) {
     const slot = await ordersRepository.findCapacitySlotById(parsedSlotId);
     if (!slot) {
       throw createError(404, "SLOT_NOT_FOUND", "Requested slot was not found");
+    }
+
+    const requestedServiceIds = extractRequestedServiceIds(lineItems);
+    const slotServiceId = slot.serviceId?.toString?.() || null;
+    if (!slotServiceId || !requestedServiceIds.includes(slotServiceId)) {
+      const preferredServiceId = requestedServiceIds[0] || null;
+      const preferredServiceObjectId = preferredServiceId ? parseObjectIdOrNull(preferredServiceId) : null;
+      const alternatives = preferredServiceObjectId
+        ? await findAlternativeSlots({
+            _id: parsedSlotId,
+            serviceId: preferredServiceObjectId,
+            startTime: slot.startTime,
+          })
+        : [];
+
+      return {
+        status: 409,
+        body: {
+          code: "SLOT_SERVICE_MISMATCH",
+          message: "Requested slot does not match selected service configuration",
+          alternatives,
+        },
+      };
     }
 
     const slotStartIso = new Date(slot.startTime).toISOString();

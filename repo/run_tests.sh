@@ -7,7 +7,7 @@ BACKEND_DIR="${BACKEND_DIR:-$(pwd)/backend}"
 if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
   if command -v docker >/dev/null 2>&1; then
     docker compose down --remove-orphans
-    docker compose run --build --rm test-runner
+    NODE_ENV=test SEED_FIXTURES=true INTERNAL_ROUTES_ENABLED=true INTERNAL_ROUTES_TOKEN=dev-internal-token TRUST_PROXY_HEADERS=true TLS_ENABLED=false docker compose run --build --rm test-runner
     status=$?
     docker compose down --remove-orphans
     exit "$status"
@@ -44,6 +44,22 @@ wait_for_api() {
   done
 }
 
+initialize_internal_admin_token() {
+  response_file="/tmp/internal_admin_login.json"
+  code=$(curl -sS -o "$response_file" -w "%{http_code}" -X POST "$API_BASE_URL/api/auth/login" \
+    -H "Content-Type: application/json" \
+    -H "X-Device-Id: internal-test-admin-device" \
+    -d '{"username":"admin_demo","password":"devpass123456"}')
+
+  if [ "$code" != "200" ]; then
+    echo "Failed to initialize internal admin token"
+    return 1
+  fi
+
+  INTERNAL_ADMIN_TOKEN=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!p.accessToken)process.exit(1);process.stdout.write(p.accessToken);' "$response_file")
+  export INTERNAL_ADMIN_TOKEN
+}
+
 trap cleanup EXIT
 
 run_test() {
@@ -70,7 +86,12 @@ if ! wait_for_api; then
   exit 1
 fi
 
+if ! initialize_internal_admin_token; then
+  exit 1
+fi
+
 run_test "API health endpoint returns 200 and status ok" "./API_tests/health_check_test.sh"
+run_test "Internal routes require shared token when enabled" "./API_tests/internal_routes_token_required_test.sh"
 run_test "Seed data exists and customer account is present" "./API_tests/seed_check_test.sh"
 run_test "Unique username constraint is enforced" "./API_tests/unique_username_test.sh"
 run_test "Auth login succeeds with seeded account" "./API_tests/auth_login_success_test.sh"
@@ -106,14 +127,19 @@ run_test "Verified approved review appears in service reviews" "./API_tests/revi
 run_test "Quarantined review hidden from public list" "./API_tests/review_quarantine_visibility_test.sh"
 run_test "Ticket create requires order id" "./API_tests/ticket_missing_order_test.sh"
 run_test "Ticket category routes to deterministic team queue" "./API_tests/ticket_category_routing_test.sh"
+run_test "Frontend ticket categories route to non-generic queues" "./API_tests/ticket_frontend_category_routing_test.sh"
+run_test "Ticket create rejects cross-user media attachments" "./API_tests/ticket_attachment_ownership_test.sh"
+run_test "Ticket status transition policy enforces role and state" "./API_tests/ticket_status_transition_policy_test.sh"
 run_test "Ticket resolve outcome is immutable" "./API_tests/ticket_resolve_immutable_test.sh"
 run_test "Ticket staff actions update pause and legal hold state" "./API_tests/ticket_staff_actions_test.sh"
 run_test "Ticket moderator can resolve and legal-hold while customer remains blocked" "./API_tests/ticket_moderator_dispute_actions_test.sh"
 run_test "Retention policy prunes closed ticket attachments unless legal hold" "./API_tests/retention_legal_hold_policy_test.sh"
 run_test "Ticket SLA fields use business-hours fixture" "./API_tests/ticket_sla_fields_test.sh"
 run_test "Scheduled content stays non-public until publish" "./API_tests/content_schedule_visibility_test.sh"
+run_test "Scheduled content auto-publishes when due" "./API_tests/content_scheduled_publish_execution_test.sh"
 run_test "Content rollback updates published pointer" "./API_tests/content_rollback_test.sh"
 run_test "Media delete blocked when referenced" "./API_tests/media_delete_blocked_test.sh"
+run_test "Media delete enforces object ownership" "./API_tests/media_delete_ownership_test.sh"
 run_test "Inbox hides moderator-only message from customer" "./API_tests/inbox_role_visibility_test.sh"
 run_test "Inbox mark-read persists per user" "./API_tests/inbox_mark_read_test.sh"
 run_test "Search returns only published entities" "./API_tests/search_published_only_test.sh"

@@ -15,13 +15,45 @@ function createMediaService(deps) {
     ObjectId,
   } = deps;
 
+  function getOwnedRefCount(media, actorId) {
+    if (!actorId || !media) {
+      return 0;
+    }
+
+    const ownerRefs = media.ownerRefs && typeof media.ownerRefs === "object" ? media.ownerRefs : null;
+    const explicitCount = ownerRefs ? Number(ownerRefs[actorId]) : 0;
+    if (Number.isFinite(explicitCount) && explicitCount > 0) {
+      return explicitCount;
+    }
+
+    const ownerId = media?.createdBy ? media.createdBy.toString() : null;
+    if (ownerId === actorId) {
+      return 1;
+    }
+
+    const ownerIds = Array.isArray(media?.ownerIds)
+      ? media.ownerIds.map((owner) => owner?.toString?.() || String(owner))
+      : [];
+    return ownerIds.includes(actorId) ? 1 : 0;
+  }
+
+  function canManageMedia(auth, media) {
+    const roles = Array.isArray(auth?.roles) ? auth.roles : [];
+    if (roles.some((role) => ["administrator", "service_manager", "moderator"].includes(role))) {
+      return true;
+    }
+
+    const actorId = auth?.userId || auth?.sub || null;
+    return getOwnedRefCount(media, actorId) > 0;
+  }
+
   return {
-    uploadMedia: async ({ auth, files, purpose }) => {
+    uploadMedia: async ({ auth, crop, files, purpose }) => {
       if (!Array.isArray(files) || files.length === 0) {
         throw createError(400, "NO_FILES", "At least one file is required");
       }
-      if (!["review", "ticket", "content"].includes(purpose)) {
-        throw createError(400, "INVALID_PURPOSE", "purpose must be one of review, ticket, content");
+      if (!["review", "ticket", "content", "public_asset"].includes(purpose)) {
+        throw createError(400, "INVALID_PURPOSE", "purpose must be one of review, ticket, content, public_asset");
       }
 
       await fs.mkdir(MEDIA_UPLOAD_DIR, { recursive: true });
@@ -40,36 +72,47 @@ function createMediaService(deps) {
           throw createError(400, "FILE_TOO_LARGE", "File exceeds maximum size of 10 MB");
         }
 
-        const processedBuffer = await maybeCompressImage(file.buffer, declaredMime);
+        const processedBuffer = await maybeCompressImage(file.buffer, declaredMime, crop);
         const sha256 = crypto.createHash("sha256").update(processedBuffer).digest("hex");
 
         const existing = await mediaRepository.findMediaBySha256(sha256);
         if (existing) {
-          await mediaRepository.incrementMediaRefCount(existing._id);
+          const ownerId = auth?.sub ? new ObjectId(auth.sub) : null;
+          await mediaRepository.incrementMediaRefCount(existing._id, ownerId);
           uploaded.push({
             mediaId: existing._id.toString(),
             sha256,
             mime: existing.mime,
             byteSize: existing.byteSize,
             deduplicated: true,
+            url: ["public_asset", "content"].includes(existing.purpose)
+              ? `/media/files/${existing.storagePath}`
+              : `/api/media/files/${existing._id.toString()}`,
           });
           continue;
         }
 
         const extension = ALLOWED_MEDIA_MIME[declaredMime];
         const fileName = `${sha256}.${extension}`;
-        const storagePath = path.join(MEDIA_UPLOAD_DIR, fileName);
-        await fs.writeFile(storagePath, processedBuffer, { flag: "wx" });
+        const storageScope = ["content", "public_asset"].includes(purpose) ? "public" : "private";
+        const scopedStoragePath = path.join(storageScope, fileName);
+        const fullStoragePath = path.join(MEDIA_UPLOAD_DIR, scopedStoragePath);
+        await fs.mkdir(path.dirname(fullStoragePath), { recursive: true });
+        await fs.writeFile(fullStoragePath, processedBuffer, { flag: "wx" });
 
         try {
+          const ownerId = auth?.sub ? new ObjectId(auth.sub) : null;
+          const ownerRefs = ownerId ? { [ownerId.toString()]: 1 } : {};
           const insert = await mediaRepository.insertMedia({
             sha256,
             byteSize: processedBuffer.length,
             mime: declaredMime,
             refCount: 1,
             purpose,
-            storagePath: fileName,
-            createdBy: auth?.sub ? new ObjectId(auth.sub) : null,
+            storagePath: scopedStoragePath,
+            createdBy: ownerId,
+            ownerIds: ownerId ? [ownerId] : [],
+            ownerRefs,
             createdAt: new Date(),
             updatedAt: new Date(),
           });
@@ -80,17 +123,23 @@ function createMediaService(deps) {
             mime: declaredMime,
             byteSize: processedBuffer.length,
             deduplicated: false,
-            url: `/media/files/${fileName}`,
+            url: ["content", "public_asset"].includes(purpose)
+              ? `/media/files/${scopedStoragePath}`
+              : `/api/media/files/${insert.insertedId.toString()}`,
           });
         } catch (error) {
           if (error && error.code === 11000) {
-            const deduped = await mediaRepository.findAndIncrementBySha256(sha256);
+            const ownerId = auth?.sub ? new ObjectId(auth.sub) : null;
+            const deduped = await mediaRepository.findAndIncrementBySha256(sha256, ownerId);
             uploaded.push({
               mediaId: deduped._id.toString(),
               sha256,
               mime: deduped.mime,
               byteSize: deduped.byteSize,
               deduplicated: true,
+              url: ["public_asset", "content"].includes(deduped.purpose)
+                ? `/media/files/${deduped.storagePath}`
+                : `/api/media/files/${deduped._id.toString()}`,
             });
           } else {
             throw error;
@@ -104,9 +153,12 @@ function createMediaService(deps) {
       };
     },
 
-    deleteMediaById: async ({ mediaId }) => {
+    deleteMediaById: async ({ auth, mediaId }) => {
       const media = await mediaRepository.findMediaById(mediaId);
       if (!media) {
+        throw createError(404, "MEDIA_NOT_FOUND", "Media not found");
+      }
+      if (!canManageMedia(auth, media)) {
         throw createError(404, "MEDIA_NOT_FOUND", "Media not found");
       }
 
@@ -132,6 +184,34 @@ function createMediaService(deps) {
         };
       }
 
+      if ((media.refCount || 0) > 1) {
+        const roles = Array.isArray(auth?.roles) ? auth.roles : [];
+        const isPrivileged = roles.some((role) => ["administrator", "service_manager", "moderator"].includes(role));
+        const actorId = auth?.userId || auth?.sub || null;
+        const actorObjectId = actorId ? new ObjectId(actorId) : null;
+
+        if (!isPrivileged && !actorObjectId) {
+          throw createError(404, "MEDIA_NOT_FOUND", "Media not found");
+        }
+
+        const updated = await mediaRepository.decrementMediaRefCount(mediaId, isPrivileged ? null : actorObjectId);
+        if (!updated) {
+          throw createError(404, "MEDIA_NOT_FOUND", "Media not found");
+        }
+
+        if (!isPrivileged && actorId) {
+          const remainingOwnerRefs = Number(updated.ownerRefs?.[actorId] ?? 0);
+          if (!Number.isFinite(remainingOwnerRefs) || remainingOwnerRefs <= 0) {
+            await mediaRepository.cleanupMediaOwnerRef(mediaId, actorObjectId);
+          }
+        }
+
+        return {
+          status: 200,
+          body: { status: "ok" },
+        };
+      }
+
       await mediaRepository.deleteMediaById(mediaId);
       if (media.storagePath) {
         await fs.rm(path.join(MEDIA_UPLOAD_DIR, media.storagePath), { force: true });
@@ -140,6 +220,27 @@ function createMediaService(deps) {
       return {
         status: 200,
         body: { status: "ok" },
+      };
+    },
+
+    getMediaFileById: async ({ auth, mediaId }) => {
+      const media = await mediaRepository.findMediaById(mediaId);
+      if (!media) {
+        throw createError(404, "MEDIA_NOT_FOUND", "Media not found");
+      }
+      if (!canManageMedia(auth, media)) {
+        throw createError(404, "MEDIA_NOT_FOUND", "Media not found");
+      }
+
+      const filePath = path.resolve(MEDIA_UPLOAD_DIR, media.storagePath || "");
+      const mediaRoot = path.resolve(MEDIA_UPLOAD_DIR) + path.sep;
+      if (!filePath.startsWith(mediaRoot)) {
+        throw createError(400, "INVALID_MEDIA_PATH", "Media path is invalid");
+      }
+
+      return {
+        filePath,
+        mime: media.mime || "application/octet-stream",
       };
     },
   };

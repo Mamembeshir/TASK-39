@@ -1,6 +1,8 @@
 #!/bin/sh
 
 base_url="${API_BASE_URL:-http://api:4000}"
+internal_token="${INTERNAL_ROUTES_TOKEN:-dev-internal-token}"
+internal_admin_token="${INTERNAL_ADMIN_TOKEN:-}"
 
 customer_login_code=$(curl -sS -o /tmp/ticket_staff_customer_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
   -H "Content-Type: application/json" \
@@ -12,7 +14,9 @@ admin_login_code=$(curl -sS -o /tmp/ticket_staff_admin_login.json -w "%{http_cod
   -H "X-Device-Id: ticket-staff-admin-device" \
   -d '{"username":"admin_demo","password":"devpass123456"}')
 
-fixture_code=$(curl -sS -o /tmp/ticket_staff_fixture.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order")
+fixture_code=$(curl -sS -o /tmp/ticket_staff_fixture.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order" \
+  -H "X-Internal-Token: $internal_token" \
+  -H "Authorization: Bearer $internal_admin_token")
 
 if [ "$customer_login_code" != "200" ] || [ "$admin_login_code" != "200" ] || [ "$fixture_code" != "201" ]; then
   exit 1
@@ -51,7 +55,10 @@ resume_code=$(curl -sS -o /tmp/ticket_staff_resume.json -w "%{http_code}" -X POS
 detail_code=$(curl -sS -o /tmp/ticket_staff_detail.json -w "%{http_code}" "$base_url/api/tickets/$ticket_id" \
   -H "Authorization: Bearer $admin_token")
 
-if [ "$hold_code" != "200" ] || [ "$pause_code" != "200" ] || [ "$resume_code" != "200" ] || [ "$detail_code" != "200" ]; then
+audit_code=$(curl -sS -o /tmp/ticket_staff_audit.json -w "%{http_code}" "$base_url/api/admin/audit" \
+  -H "Authorization: Bearer $admin_token")
+
+if [ "$hold_code" != "200" ] || [ "$pause_code" != "200" ] || [ "$resume_code" != "200" ] || [ "$detail_code" != "200" ] || [ "$audit_code" != "200" ]; then
   exit 1
 fi
 
@@ -61,13 +68,18 @@ const hold=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
 const pause=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
 const resume=JSON.parse(fs.readFileSync(process.argv[3],"utf8"));
 const detail=JSON.parse(fs.readFileSync(process.argv[4],"utf8"));
+const audit=JSON.parse(fs.readFileSync(process.argv[5],"utf8"));
 const ticket=detail.ticket;
+const hasLegalHoldAudit=(audit||[]).some((entry) => entry.action === "ticket.legal_hold.update" && entry.metadata && entry.metadata.details && entry.metadata.details.ticketId === ticket.id && entry.metadata.details.legalHold === true);
+const hasStatusAudit=(audit||[]).filter((entry) => entry.action === "ticket.status.update" && entry.metadata && entry.metadata.details && entry.metadata.details.ticketId === ticket.id).length >= 2;
 const ok = hold.legalHold === true
   && pause.status === "waiting_on_customer"
   && resume.status === "open"
   && ticket.legalHold === true
   && ticket.sla
   && ticket.sla.isPaused === false
-  && ticket.status === "open";
+  && ticket.status === "open"
+  && hasLegalHoldAudit
+  && hasStatusAudit;
 process.exit(ok ? 0 : 1);
-' /tmp/ticket_staff_hold.json /tmp/ticket_staff_pause.json /tmp/ticket_staff_resume.json /tmp/ticket_staff_detail.json
+' /tmp/ticket_staff_hold.json /tmp/ticket_staff_pause.json /tmp/ticket_staff_resume.json /tmp/ticket_staff_detail.json /tmp/ticket_staff_audit.json

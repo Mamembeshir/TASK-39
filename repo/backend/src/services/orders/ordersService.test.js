@@ -18,7 +18,7 @@ test("createOrder returns quote changed when provided signature is stale", async
     createQuoteSignature: () => "fresh-signature",
     findAlternativeSlots: async () => [],
     ordersRepository: {
-      findCapacitySlotById: async () => ({ _id: "slot-1", startTime: new Date("2026-01-01T10:00:00.000Z") }),
+      findCapacitySlotById: async () => ({ _id: "slot-1", serviceId: { toString: () => "svc-1" }, startTime: new Date("2026-01-01T10:00:00.000Z") }),
     },
     releaseSlotCapacity: async () => {},
   });
@@ -27,7 +27,7 @@ test("createOrder returns quote changed when provided signature is stale", async
     authSub: "65f000000000000000000001",
     ObjectId: function ObjectId(value) { this.value = value; },
     payload: {
-      lineItems: [],
+      lineItems: [{ type: "service", serviceId: "svc-1", durationMinutes: 60, quantity: 1 }],
       slotId: "slot-1",
       bookingRequestedAt: "2026-01-01T09:00:00.000Z",
       milesFromDepot: 5,
@@ -50,7 +50,7 @@ test("createOrder returns slot unavailable alternatives when capacity decrement 
     createQuoteSignature: () => "sig",
     findAlternativeSlots: async () => [{ slotId: "alt-1" }],
     ordersRepository: {
-      findCapacitySlotById: async () => ({ _id: "slot-1", startTime: new Date("2026-01-01T10:00:00.000Z") }),
+      findCapacitySlotById: async () => ({ _id: "slot-1", serviceId: { toString: () => "svc-1" }, startTime: new Date("2026-01-01T10:00:00.000Z") }),
       decrementCapacitySlot: async () => null,
     },
     releaseSlotCapacity: async () => {},
@@ -60,7 +60,7 @@ test("createOrder returns slot unavailable alternatives when capacity decrement 
     authSub: "65f000000000000000000001",
     ObjectId: function ObjectId(value) { this.value = value; },
     payload: {
-      lineItems: [],
+      lineItems: [{ type: "service", serviceId: "svc-1", durationMinutes: 60, quantity: 1 }],
       slotId: "slot-1",
       bookingRequestedAt: "2026-01-01T09:00:00.000Z",
       milesFromDepot: 5,
@@ -105,4 +105,40 @@ test("cancelOrderById releases slot capacity and writes audit log", async () => 
   assert.deepEqual(result, { status: "ok", state: "cancelled" });
   assert.deepEqual(releasedSlotIds, ["slot-1"]);
   assert.equal(auditAction, "order.status.cancelled");
+});
+
+test("createOrder rejects slots that do not match selected services", async () => {
+  let alternativesRequestedForServiceId = null;
+  const service = createOrdersService({
+    assertCanAccessOrder: () => {},
+    buildQuoteFromRequestPayload: async () => ({ notServiceable: false, totals: { total: 100 } }),
+    createError,
+    createQuoteSignature: () => "sig",
+    findAlternativeSlots: async (slot) => {
+      alternativesRequestedForServiceId = slot.serviceId?.toString?.() || null;
+      return [{ slotId: "alt-slot-1" }];
+    },
+    ordersRepository: {
+      findCapacitySlotById: async () => ({ _id: "slot-1", serviceId: { toString: () => "svc-2" }, startTime: new Date("2026-01-01T10:00:00.000Z") }),
+    },
+    releaseSlotCapacity: async () => {},
+  });
+
+  const result = await service.createOrder({
+    authSub: "65f000000000000000000001",
+    ObjectId: function ObjectId(value) { this.value = value; },
+    payload: {
+      lineItems: [{ type: "service", serviceId: "svc-1", durationMinutes: 60, quantity: 1 }],
+      slotId: "slot-1",
+      bookingRequestedAt: "2026-01-01T09:00:00.000Z",
+      milesFromDepot: 5,
+      jurisdictionId: "j1",
+      parseObjectIdOrNull: (value) => value,
+    },
+  });
+
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, "SLOT_SERVICE_MISMATCH");
+  assert.deepEqual(result.body.alternatives, [{ slotId: "alt-slot-1" }]);
+  assert.equal(alternativesRequestedForServiceId, "svc-1");
 });

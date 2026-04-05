@@ -11,9 +11,17 @@ function createNextRecorder() {
   return { calls, next };
 }
 
-test("getClientIp prefers x-forwarded-for first entry", () => {
+test("getClientIp ignores x-forwarded-for by default", () => {
+  delete process.env.TRUST_PROXY_HEADERS;
+  const ip = getClientIp({ headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" }, ip: "9.9.9.9" });
+  assert.equal(ip, "9.9.9.9");
+});
+
+test("getClientIp uses x-forwarded-for first entry when enabled", () => {
+  process.env.TRUST_PROXY_HEADERS = "true";
   const ip = getClientIp({ headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" }, ip: "9.9.9.9" });
   assert.equal(ip, "1.2.3.4");
+  delete process.env.TRUST_PROXY_HEADERS;
 });
 
 test("hasRole matches any allowed role", () => {

@@ -1,3 +1,5 @@
+const { logger } = require("../../utils/logger");
+
 function assessLoginRisk({
   isNewDevice = false,
   knownDeviceCount = 0,
@@ -50,26 +52,41 @@ function assessLoginRisk({
 function createAuditService({ getDatabase, getClientIp }) {
   return {
     assessLoginRisk,
-    writeAuditLog: async ({ username, userId, action, outcome, req, isNewDevice = false, riskAssessment = null }) => {
+    writeAuditLog: async ({
+      username,
+      userId,
+      action,
+      outcome,
+      req,
+      isNewDevice = false,
+      riskAssessment = null,
+      details = null,
+    }) => {
       try {
         const database = getDatabase();
+        const safeReq = req || { headers: {}, ip: null };
+        const metadata = {
+          username: username || null,
+          ip: getClientIp(safeReq),
+          userAgent: safeReq.headers["user-agent"] || "unknown",
+          outcome,
+          isNewDevice,
+          risk: riskAssessment,
+        };
+        if (details && typeof details === "object") {
+          metadata.details = details;
+        }
+
         await database.collection("audit_logs").insertOne({
           who: userId || null,
           action,
           when: new Date(),
-          metadata: {
-            username: username || null,
-            ip: getClientIp(req),
-            userAgent: req.headers["user-agent"] || "unknown",
-            outcome,
-            isNewDevice,
-            risk: riskAssessment,
-          },
+          metadata,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
       } catch (error) {
-        console.error(`Failed to write audit log: ${error.message}`);
+        logger.error({ err: error, action, outcome, userId: userId?.toString?.() || null }, "Failed to write audit log");
       }
     },
   };

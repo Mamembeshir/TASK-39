@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const sharp = require("sharp");
 
 const { createMediaProcessingService, detectMimeFromMagicBytes } = require("./mediaProcessingService");
 
@@ -23,4 +24,74 @@ test("maybeCompressImage is a no-op when processing is disabled", async () => {
   const buffer = Buffer.from("plain-bytes");
   const result = await service.maybeCompressImage(buffer, "image/png");
   assert.equal(result, buffer);
+});
+
+test("maybeCompressImage applies optional crop when valid", async () => {
+  const source = await sharp({
+    create: {
+      width: 4,
+      height: 4,
+      channels: 3,
+      background: { r: 200, g: 100, b: 50 },
+    },
+  })
+    .png()
+    .toBuffer();
+
+  const service = createMediaProcessingService({ mediaEnableProcessing: true });
+  const cropped = await service.maybeCompressImage(source, "image/png", {
+    x: 1,
+    y: 1,
+    width: 2,
+    height: 2,
+  });
+
+  const metadata = await sharp(cropped).metadata();
+  assert.equal(metadata.width, 2);
+  assert.equal(metadata.height, 2);
+});
+
+test("maybeCompressImage ignores invalid crop values", async () => {
+  const source = await sharp({
+    create: {
+      width: 4,
+      height: 4,
+      channels: 3,
+      background: { r: 10, g: 20, b: 30 },
+    },
+  })
+    .png()
+    .toBuffer();
+
+  const service = createMediaProcessingService({ mediaEnableProcessing: true });
+  const withInvalidCrop = await service.maybeCompressImage(source, "image/png", {
+    x: -1,
+    y: 0,
+    width: 2,
+    height: 2,
+  });
+
+  const metadata = await sharp(withInvalidCrop).metadata();
+  assert.equal(metadata.width, 4);
+  assert.equal(metadata.height, 4);
+});
+
+test("maybeCompressImage is deterministic for same crop input", async () => {
+  const source = await sharp({
+    create: {
+      width: 3,
+      height: 3,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 },
+    },
+  })
+    .png()
+    .toBuffer();
+
+  const service = createMediaProcessingService({ mediaEnableProcessing: true });
+  const crop = { x: 0, y: 0, width: 2, height: 2 };
+  const first = await service.maybeCompressImage(source, "image/png", crop);
+  const second = await service.maybeCompressImage(source, "image/png", crop);
+
+  assert.deepEqual(first, second);
 });

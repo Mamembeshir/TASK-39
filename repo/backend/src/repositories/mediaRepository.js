@@ -5,11 +5,46 @@ async function findMediaBySha256(sha256) {
   return database.collection("media_metadata").findOne({ sha256 });
 }
 
-async function incrementMediaRefCount(mediaId) {
+async function incrementMediaRefCount(mediaId, ownerId = null) {
   const database = getDatabase();
-  return database
-    .collection("media_metadata")
-    .updateOne({ _id: mediaId }, { $inc: { refCount: 1 }, $set: { updatedAt: new Date() } });
+  const update = { $inc: { refCount: 1 }, $set: { updatedAt: new Date() } };
+  if (ownerId) {
+    const ownerKey = ownerId.toString();
+    update.$inc[`ownerRefs.${ownerKey}`] = 1;
+    update.$addToSet = { ownerIds: ownerId };
+  }
+  return database.collection("media_metadata").updateOne({ _id: mediaId }, update);
+}
+
+async function decrementMediaRefCount(mediaId, ownerId = null) {
+  const database = getDatabase();
+  const filter = { _id: mediaId, refCount: { $gt: 0 } };
+  const update = { $inc: { refCount: -1 }, $set: { updatedAt: new Date() } };
+
+  if (ownerId) {
+    const ownerKey = ownerId.toString();
+    update.$inc[`ownerRefs.${ownerKey}`] = -1;
+    filter.$or = [
+      { [`ownerRefs.${ownerKey}`]: { $gt: 0 } },
+      { ownerIds: ownerId },
+      { createdBy: ownerId },
+    ];
+  }
+
+  return database.collection("media_metadata").findOneAndUpdate(filter, update, { returnDocument: "after" });
+}
+
+async function cleanupMediaOwnerRef(mediaId, ownerId) {
+  const database = getDatabase();
+  const ownerKey = ownerId.toString();
+  return database.collection("media_metadata").updateOne(
+    { _id: mediaId },
+    {
+      $unset: { [`ownerRefs.${ownerKey}`]: "" },
+      $pull: { ownerIds: ownerId },
+      $set: { updatedAt: new Date() },
+    },
+  );
 }
 
 async function insertMedia(doc) {
@@ -17,13 +52,19 @@ async function insertMedia(doc) {
   return database.collection("media_metadata").insertOne(doc);
 }
 
-async function findAndIncrementBySha256(sha256) {
+async function findAndIncrementBySha256(sha256, ownerId = null) {
   const database = getDatabase();
+  const update = { $inc: { refCount: 1 }, $set: { updatedAt: new Date() } };
+  if (ownerId) {
+    const ownerKey = ownerId.toString();
+    update.$inc[`ownerRefs.${ownerKey}`] = 1;
+    update.$addToSet = { ownerIds: ownerId };
+  }
   return database
     .collection("media_metadata")
     .findOneAndUpdate(
       { sha256 },
-      { $inc: { refCount: 1 }, $set: { updatedAt: new Date() } },
+      update,
       { returnDocument: "after" },
     );
 }
@@ -68,7 +109,9 @@ async function deleteMediaById(mediaId) {
 }
 
 module.exports = {
+  cleanupMediaOwnerRef,
   deleteMediaById,
+  decrementMediaRefCount,
   findAndIncrementBySha256,
   findMediaById,
   findMediaByIds,

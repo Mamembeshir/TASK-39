@@ -21,6 +21,14 @@ export function FavoritesPage() {
     await favoritesQuery.refetch();
   }
 
+  async function handleToggleCompare(serviceId: string) {
+    try {
+      await toggleCompare(serviceId);
+    } catch {
+      toast.error('Unable to update compare list');
+    }
+  }
+
   return (
     <PageShell>
       <div className="grid gap-6">
@@ -58,7 +66,7 @@ export function FavoritesPage() {
                       <Button variant="secondary" asChild>
                         <Link to={`/services/${service.id}`}>View details</Link>
                       </Button>
-                      <Button variant="ghost" onClick={() => toggleCompare(service.id)}>{isCompared ? 'Remove compare' : 'Add compare'}</Button>
+                      <Button variant="ghost" onClick={() => void handleToggleCompare(service.id)}>{isCompared ? 'Remove compare' : 'Add compare'}</Button>
                       <Button variant="ghost" onClick={() => handleRemove(service.id)}>Remove</Button>
                     </div>
                   </CardContent>

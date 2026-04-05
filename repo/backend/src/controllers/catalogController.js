@@ -1,5 +1,5 @@
 function createCatalogController(deps) {
-  const { catalogService } = deps;
+  const { catalogService, ObjectId } = deps;
 
   return {
     listServices: async (req, res, next) => {
@@ -58,7 +58,7 @@ function createCatalogController(deps) {
 
     publishServiceQuestionById: async (req, res, next) => {
       try {
-        const result = await catalogService.publishServiceQuestionById({ id: req.params.id, body: req.body, auth: req.auth, ObjectId });
+        const result = await catalogService.publishServiceQuestionById({ id: req.params.id, body: req.body, auth: req.auth, ObjectId, req });
         return res.status(200).json(result);
       } catch (error) {
         return next(error);
@@ -67,7 +67,7 @@ function createCatalogController(deps) {
 
     rejectServiceQuestionById: async (req, res, next) => {
       try {
-        const result = await catalogService.rejectServiceQuestionById({ id: req.params.id });
+        const result = await catalogService.rejectServiceQuestionById({ id: req.params.id, auth: req.auth, ObjectId, req });
         return res.status(200).json(result);
       } catch (error) {
         return next(error);
@@ -85,7 +85,7 @@ function createCatalogController(deps) {
 
     createService: async (req, res, next) => {
       try {
-        const result = await catalogService.createService({ body: req.body });
+        const result = await catalogService.createService({ auth: req.auth, body: req.body, req });
         return res.status(201).json(result);
       } catch (error) {
         return next(error);
@@ -94,7 +94,7 @@ function createCatalogController(deps) {
 
     updateServiceById: async (req, res, next) => {
       try {
-        const result = await catalogService.updateServiceById({ id: req.params.id, body: req.body });
+        const result = await catalogService.updateServiceById({ auth: req.auth, id: req.params.id, body: req.body, req });
         return res.status(200).json(result);
       } catch (error) {
         return next(error);
@@ -129,7 +129,7 @@ function createCatalogController(deps) {
 
     createBundle: async (req, res, next) => {
       try {
-        const result = await catalogService.createBundle({ body: req.body });
+        const result = await catalogService.createBundle({ auth: req.auth, body: req.body, req });
         return res.status(201).json(result);
       } catch (error) {
         return next(error);
@@ -138,7 +138,7 @@ function createCatalogController(deps) {
 
     updateBundleById: async (req, res, next) => {
       try {
-        const result = await catalogService.updateBundleById({ id: req.params.id, body: req.body });
+        const result = await catalogService.updateBundleById({ auth: req.auth, id: req.params.id, body: req.body, req });
         return res.status(200).json(result);
       } catch (error) {
         return next(error);

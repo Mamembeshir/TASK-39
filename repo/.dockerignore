@@ -1,0 +1,38 @@
+.git
+.gitignore
+
+# deps / build
+node_modules
+**/node_modules
+dist
+coverage
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# local tool state / caches
+.vscode
+.idea
+.opencode
+.codex
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.venv
+.cache
+.tmp
+tmp
+
+# local db and dumps
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+dump
+mongo-data
+
+# test output artifacts
+*.log

@@ -20,6 +20,14 @@ export function ServiceCard({ service }: { service: ServiceSummary }) {
     }
   }
 
+  async function handleToggleCompare() {
+    try {
+      await toggleCompare(service.id);
+    } catch {
+      toast.error('Unable to update compare list');
+    }
+  }
+
   return (
     <Card className="group flex h-full flex-col overflow-hidden transition hover:-translate-y-0.5 hover:border-primary/30">
       <CardHeader className="grid gap-3">
@@ -39,7 +47,7 @@ export function ServiceCard({ service }: { service: ServiceSummary }) {
           <Button variant="secondary" asChild>
             <Link to={`/services/${service.id}`}>View details</Link>
           </Button>
-          <Button variant="ghost" onClick={() => toggleCompare(service.id)}>{isCompared ? 'Remove compare' : 'Compare'}</Button>
+          <Button variant="ghost" onClick={() => void handleToggleCompare()}>{isCompared ? 'Remove compare' : 'Compare'}</Button>
           <Button variant="ghost" onClick={handleFavorite}>Favorite</Button>
         </div>
       </CardContent>

@@ -85,3 +85,87 @@ test("scheduleContentById writes content.schedule audit action", async () => {
   assert.equal(auditLogs.length, 1);
   assert.equal(auditLogs[0].action, "content.schedule");
 });
+
+test("publishContentById writes content.publish audit action", async () => {
+  const auditLogs = [];
+  const versionId = { toString: () => "ver-1" };
+  const contentId = { toString: () => "content-1" };
+  const service = createContentService({
+    buildContentVersion: () => ({ id: versionId }),
+    contentRepository: {
+      findContentById: async () => ({
+        _id: contentId,
+        currentVersionId: versionId,
+        versions: [{ id: versionId, body: "published body", mediaIds: [] }],
+      }),
+      publishVersion: async () => {},
+    },
+    createError,
+    extractContentMediaRefs: () => [],
+    mediaRepository: {
+      findMediaByIds: async () => [],
+    },
+    ObjectId: function MockObjectId(value) {
+      return { toString: () => String(value) };
+    },
+    parseObjectIdArray: () => ({ ok: true, parsed: [] }),
+    parseObjectIdOrNull: () => versionId,
+    syncContentSearchDocument: async () => {},
+    writeAuditLog: async (entry) => {
+      auditLogs.push(entry);
+    },
+  });
+
+  const result = await service.publishContentById({
+    auth: { username: "admin_demo", sub: "65f000000000000000000002" },
+    body: {},
+    contentId,
+    req: { method: "POST", originalUrl: "/api/content/content-1/publish", headers: {} },
+  });
+
+  assert.equal(result.id, "content-1");
+  assert.equal(auditLogs.length, 1);
+  assert.equal(auditLogs[0].action, "content.publish");
+});
+
+test("rollbackContentById writes content.rollback audit action", async () => {
+  const auditLogs = [];
+  const rollbackVersionId = { toString: () => "ver-2" };
+  const contentId = { toString: () => "content-1" };
+  const service = createContentService({
+    buildContentVersion: () => ({ id: rollbackVersionId }),
+    contentRepository: {
+      findContentById: async () => ({
+        _id: contentId,
+        currentVersionId: rollbackVersionId,
+        versions: [{ id: rollbackVersionId, body: "rollback body", mediaIds: [] }],
+      }),
+      rollbackVersion: async () => {},
+    },
+    createError,
+    extractContentMediaRefs: () => [],
+    mediaRepository: {
+      findMediaByIds: async () => [],
+    },
+    ObjectId: function MockObjectId(value) {
+      return { toString: () => String(value) };
+    },
+    parseObjectIdArray: () => ({ ok: true, parsed: [] }),
+    parseObjectIdOrNull: () => rollbackVersionId,
+    syncContentSearchDocument: async () => {},
+    writeAuditLog: async (entry) => {
+      auditLogs.push(entry);
+    },
+  });
+
+  const result = await service.rollbackContentById({
+    auth: { username: "admin_demo", sub: "65f000000000000000000002" },
+    body: { versionId: "ver-2" },
+    contentId,
+    req: { method: "POST", originalUrl: "/api/content/content-1/rollback", headers: {} },
+  });
+
+  assert.equal(result.id, "content-1");
+  assert.equal(auditLogs.length, 1);
+  assert.equal(auditLogs[0].action, "content.rollback");
+});

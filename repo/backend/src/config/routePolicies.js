@@ -79,6 +79,12 @@ const routePolicies = [
   { method: "GET", path: "/api/admin/audit", auth: "administrator" },
   { method: "GET", path: "/api/admin/blacklist", auth: "administrator" },
   { method: "POST", path: "/api/admin/blacklist", auth: "administrator" },
+
+  { method: "GET", path: "/api/internal/seed-check", auth: "administrator" },
+  { method: "POST", path: "/api/internal/test-fixtures/booking-slot", auth: "administrator" },
+  { method: "POST", path: "/api/internal/test-fixtures/completed-order", auth: "administrator" },
+  { method: "POST", path: "/api/internal/test-fixtures/blacklist-ip", auth: "administrator" },
+  { method: "POST", path: "/api/internal/constraints/users-username", auth: "administrator" },
 ];
 
 module.exports = {

@@ -9,7 +9,6 @@ import { Alert } from '@/shared/components/ui/alert';
 import { toast } from 'sonner';
 import { showApiError } from '@/shared/lib/showApiError';
 import { useBooking } from '@/features/booking/store';
-import { buildQuotePayload } from '@/features/booking/lib/quoteDraft';
 import { navigateTransition } from '@/shared/lib/navigateTransition';
 import { PageShell } from '@/shared/components/PageShell';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -103,20 +102,21 @@ export function CheckoutPage() {
   }, [slotId, slotsQuery.data]);
   const quote = state.quote;
   const checkoutPayload = useMemo(() => {
-    const fromDraft = buildQuotePayload(quoteDraft);
-    if (fromDraft) {
-      return {
-        ...fromDraft,
-        slotId,
-        slotStart: slotStartIso,
-        milesFromDepot,
-        jurisdictionId: effectiveJurisdictionId,
-        sameDayPriority,
-        taxEnabled: effectiveTaxEnabled,
-      };
+    if (!lineItems.length || !slotId) {
+      return null;
     }
-    return null;
-  }, [quoteDraft, slotId, slotStartIso, milesFromDepot, effectiveJurisdictionId, sameDayPriority, effectiveTaxEnabled]);
+
+    return {
+      lineItems,
+      slotId,
+      bookingRequestedAt: quoteDraft.bookingRequestedAt || new Date().toISOString(),
+      slotStart: slotStartIso,
+      milesFromDepot,
+      jurisdictionId: effectiveJurisdictionId,
+      sameDayPriority,
+      taxEnabled: effectiveTaxEnabled,
+    };
+  }, [lineItems, slotId, quoteDraft.bookingRequestedAt, slotStartIso, milesFromDepot, effectiveJurisdictionId, sameDayPriority, effectiveTaxEnabled]);
 
   const liveQuoteInput = useMemo(
     () => (lineItems.length
@@ -156,7 +156,7 @@ export function CheckoutPage() {
       navigateTransition(navigate, `/orders/${order.id}`, { replace: true });
     } catch (cause) {
       const conflict = cause as { code?: string; message?: string; details?: unknown; alternatives?: unknown };
-      if (conflict.code === 'SLOT_UNAVAILABLE' && Array.isArray(conflict.alternatives)) {
+      if ((conflict.code === 'SLOT_UNAVAILABLE' || conflict.code === 'SLOT_SERVICE_MISMATCH') && Array.isArray(conflict.alternatives)) {
         setAlternativeSlots(conflict.alternatives.filter((item): item is AlternativeSlot => Boolean(item && typeof item === 'object' && 'slotId' in item && 'startTime' in item)));
       }
       const details = conflict.details ? ` Details: ${JSON.stringify(conflict.details)}` : '';

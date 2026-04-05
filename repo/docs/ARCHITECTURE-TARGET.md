@@ -45,13 +45,15 @@ Auth legend:
 | GET | `/api/content/:id/versions` | staff |
 | POST | `/api/content/:id/rollback` | staff |
 | POST | `/api/media` | user |
+| GET | `/api/media/files/:id` | user (owner/staff object-level access check) |
 | DELETE | `/api/media/:id` | user |
+| GET | `/media/files/*` | public static assets only (`MEDIA_UPLOAD_DIR/public`) |
 | POST | `/api/reviews` | customer |
 | POST | `/api/moderation/reviews/:id/approve` | moderation |
 | POST | `/api/moderation/reviews/:id/reject` | moderation |
 | POST | `/api/tickets` | user (customer ownership/staff override in handler) |
 | GET | `/api/tickets/:id` | user (owner/staff check in handler) |
-| POST | `/api/tickets/:id/status` | user (owner/staff check in handler) |
+| POST | `/api/tickets/:id/status` | user (owner/staff check + role/state transition policy in handler) |
 | POST | `/api/tickets/:id/legal-hold` | staff |
 | POST | `/api/tickets/:id/resolve` | staff |
 | POST | `/api/staff/messages` | message_staff |
@@ -65,11 +67,11 @@ Auth legend:
 | PATCH | `/api/staff/bundles/:id` | staff |
 | POST | `/api/staff/bundles/:id/publish` | staff |
 | POST | `/api/staff/bundles/:id/unpublish` | staff |
-| GET | `/api/internal/seed-check` | public but dev-gated (`NODE_ENV=development` + `ENABLE_SEED_CHECK=true`) |
-| POST | `/api/internal/test-fixtures/booking-slot` | public but dev-gated |
-| POST | `/api/internal/test-fixtures/completed-order` | public but dev-gated |
-| POST | `/api/internal/test-fixtures/blacklist-ip` | public but dev-gated |
-| POST | `/api/internal/constraints/users-username` | public but dev-gated |
+| GET | `/api/internal/seed-check` | disabled by default; only available in `NODE_ENV=test` and requires admin auth + `X-Internal-Token` |
+| POST | `/api/internal/test-fixtures/booking-slot` | disabled by default; only available in `NODE_ENV=test` and requires admin auth + `X-Internal-Token` |
+| POST | `/api/internal/test-fixtures/completed-order` | disabled by default; only available in `NODE_ENV=test` and requires admin auth + `X-Internal-Token` |
+| POST | `/api/internal/test-fixtures/blacklist-ip` | disabled by default; only available in `NODE_ENV=test` and requires admin auth + `X-Internal-Token` |
+| POST | `/api/internal/constraints/users-username` | disabled by default; only available in `NODE_ENV=test` and requires admin auth + `X-Internal-Token` |
 
 ## Mongo Collections and Module Touch Map
 

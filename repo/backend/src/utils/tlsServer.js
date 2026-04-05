@@ -8,7 +8,7 @@ function resolveTlsEnabled(env) {
   if (env.TLS_ENABLED !== undefined) {
     return toBoolean(env.TLS_ENABLED);
   }
-  return env.NODE_ENV === "production";
+  return true;
 }
 
 async function createNetworkServer({ app, fs, env, port }) {

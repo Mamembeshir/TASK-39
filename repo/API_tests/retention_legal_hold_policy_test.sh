@@ -1,6 +1,8 @@
 #!/bin/sh
 
 base_url="${API_BASE_URL:-http://api:4000}"
+internal_token="${INTERNAL_ROUTES_TOKEN:-dev-internal-token}"
+internal_admin_token="${INTERNAL_ADMIN_TOKEN:-}"
 
 customer_login_code=$(curl -sS -o /tmp/retention_policy_customer_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
   -H "Content-Type: application/json" \
@@ -53,8 +55,12 @@ fi
 media_a_id=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(p.media[0].mediaId);' /tmp/retention_policy_upload_a.json)
 media_b_id=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(p.media[0].mediaId);' /tmp/retention_policy_upload_b.json)
 
-fixture_a_code=$(curl -sS -o /tmp/retention_policy_fixture_a.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order")
-fixture_b_code=$(curl -sS -o /tmp/retention_policy_fixture_b.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order")
+fixture_a_code=$(curl -sS -o /tmp/retention_policy_fixture_a.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order" \
+  -H "X-Internal-Token: $internal_token" \
+  -H "Authorization: Bearer $internal_admin_token")
+fixture_b_code=$(curl -sS -o /tmp/retention_policy_fixture_b.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/completed-order" \
+  -H "X-Internal-Token: $internal_token" \
+  -H "Authorization: Bearer $internal_admin_token")
 
 if [ "$fixture_a_code" != "201" ] || [ "$fixture_b_code" != "201" ]; then
   exit 1

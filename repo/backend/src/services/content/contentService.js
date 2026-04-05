@@ -241,7 +241,7 @@ function createContentService(deps) {
       };
     },
 
-    publishContentById: async ({ body, contentId }) => {
+    publishContentById: async ({ auth, body, contentId, req }) => {
       const { versionId } = body || {};
       const content = await findContentOrThrow(contentId);
 
@@ -258,6 +258,19 @@ function createContentService(deps) {
 
       await contentRepository.publishVersion(contentId, targetVersionId, mediaRefs);
       await syncContentSearchDocument(contentId);
+
+      await writeAuditLog({
+        username: auth?.username,
+        userId: auth?.sub ? new ObjectId(auth.sub) : null,
+        action: "content.publish",
+        outcome: "success",
+        req,
+        details: {
+          contentId: contentId.toString(),
+          publishedVersionId: targetVersionId.toString(),
+        },
+      });
+
       return { id: contentId.toString(), publishedVersionId: targetVersionId.toString() };
     },
 
@@ -281,7 +294,7 @@ function createContentService(deps) {
       };
     },
 
-    rollbackContentById: async ({ body, contentId }) => {
+    rollbackContentById: async ({ auth, body, contentId, req }) => {
       const versionId = parseObjectIdOrNull(body?.versionId);
       if (!versionId) {
         throw createError(400, "INVALID_VERSION_ID", "versionId is required and must be valid");
@@ -297,6 +310,19 @@ function createContentService(deps) {
 
       await contentRepository.rollbackVersion(contentId, versionId, mediaRefs);
       await syncContentSearchDocument(contentId);
+
+      await writeAuditLog({
+        username: auth?.username,
+        userId: auth?.sub ? new ObjectId(auth.sub) : null,
+        action: "content.rollback",
+        outcome: "success",
+        req,
+        details: {
+          contentId: contentId.toString(),
+          rollbackVersionId: versionId.toString(),
+        },
+      });
+
       return { id: contentId.toString(), publishedVersionId: versionId.toString() };
     },
 

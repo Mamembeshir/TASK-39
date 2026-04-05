@@ -18,10 +18,30 @@ function parseCookieToken(req, name) {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-function getClientIp(req) {
+function toBoolean(value, defaultValue = false) {
+  if (value === undefined || value === null || value === "") {
+    return defaultValue;
+  }
+  return String(value).toLowerCase() === "true";
+}
+
+function parseForwardedIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.length > 0) {
-    return forwarded.split(",")[0].trim();
+  if (typeof forwarded !== "string" || forwarded.length === 0) {
+    return null;
+  }
+
+  const firstHop = forwarded.split(",")[0].trim();
+  return firstHop.length > 0 ? firstHop : null;
+}
+
+function getClientIp(req) {
+  const trustProxyHeaders = toBoolean(process.env.TRUST_PROXY_HEADERS, false);
+  if (trustProxyHeaders) {
+    const forwarded = parseForwardedIp(req);
+    if (forwarded) {
+      return forwarded;
+    }
   }
   return req.ip || "unknown";
 }
