@@ -1,4 +1,10 @@
 const https = require("https");
+const os = require("os");
+const path = require("path");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
+
+const execFileAsync = promisify(execFile);
 
 function toBoolean(value) {
   return String(value || "").toLowerCase() === "true";
@@ -11,7 +17,7 @@ function resolveTlsEnabled(env) {
   return true;
 }
 
-async function createNetworkServer({ app, fs, env, port }) {
+async function createNetworkServer({ app, fs, env, port, execFile: execFileImpl = execFileAsync, createHttpsServer = https.createServer }) {
   const tlsEnabled = resolveTlsEnabled(env);
   if (!tlsEnabled) {
     return { protocol: "http", server: app.listen(port) };
@@ -25,11 +31,27 @@ async function createNetworkServer({ app, fs, env, port }) {
     throw new Error("TLS_ENABLED=true requires TLS_KEY_PATH and TLS_CERT_PATH");
   }
 
-  const [key, cert, ca] = await Promise.all([
-    fs.readFile(keyPath),
-    fs.readFile(certPath),
-    caPath ? fs.readFile(caPath) : Promise.resolve(null),
-  ]);
+  let key;
+  let cert;
+  let ca = null;
+  try {
+    [key, cert, ca] = await Promise.all([
+      fs.readFile(keyPath),
+      fs.readFile(certPath),
+      caPath ? fs.readFile(caPath) : Promise.resolve(null),
+    ]);
+  } catch (error) {
+    if (!error || error.code !== "ENOENT") {
+      throw error;
+    }
+
+    const fallback = await ensureDevTlsMaterial({ fs, execFileImpl });
+    [key, cert, ca] = await Promise.all([
+      fs.readFile(fallback.keyPath),
+      fs.readFile(fallback.certPath),
+      caPath ? fs.readFile(caPath).catch(() => null) : Promise.resolve(null),
+    ]);
+  }
 
   const options = { key, cert };
   if (ca) {
@@ -38,8 +60,48 @@ async function createNetworkServer({ app, fs, env, port }) {
 
   return {
     protocol: "https",
-    server: https.createServer(options, app).listen(port),
+    server: createHttpsServer(options, app).listen(port),
   };
+}
+
+async function ensureDevTlsMaterial({ fs, execFileImpl }) {
+  const tlsDir = path.join(os.tmpdir(), "homecareops-tls");
+  const keyPath = path.join(tlsDir, "localhost.key");
+  const certPath = path.join(tlsDir, "localhost.crt");
+
+  await fs.mkdir(tlsDir, { recursive: true });
+
+  try {
+    await Promise.all([fs.readFile(keyPath), fs.readFile(certPath)]);
+    return { keyPath, certPath };
+  } catch (error) {
+    if (error && error.code !== "ENOENT") {
+      throw error;
+    }
+  }
+
+  await execFileImpl(
+    "openssl",
+    [
+      "req",
+      "-x509",
+      "-newkey",
+      "rsa:2048",
+      "-nodes",
+      "-sha256",
+      "-days",
+      "365",
+      "-keyout",
+      keyPath,
+      "-out",
+      certPath,
+      "-subj",
+      "/CN=localhost",
+    ],
+    { cwd: tlsDir },
+  );
+
+  return { keyPath, certPath };
 }
 
 module.exports = {

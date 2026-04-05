@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const os = require("node:os");
+const path = require("node:path");
 
 const { createNetworkServer, resolveTlsEnabled } = require("./tlsServer");
 
@@ -52,6 +54,41 @@ test("createNetworkServer requires key and cert paths when TLS is enabled", asyn
       }),
     (error) => error && /TLS_KEY_PATH and TLS_CERT_PATH/.test(error.message),
   );
+});
+
+test("createNetworkServer generates fallback dev certs when configured files are missing", async () => {
+  const calls = [];
+  const fallbackDir = path.join(os.tmpdir(), "homecareops-tls");
+  const app = {
+    listen(port) {
+      calls.push(port);
+      return { close() {} };
+    },
+  };
+
+  const fsMock = {
+    mkdir: async () => {},
+    readFile: async (filePath) => {
+      if (filePath.startsWith(fallbackDir)) {
+        return Buffer.from("fake");
+      }
+      const error = new Error("missing");
+      error.code = "ENOENT";
+      throw error;
+    },
+  };
+
+  const result = await createNetworkServer({
+    app,
+    fs: fsMock,
+    env: { TLS_ENABLED: "true", TLS_KEY_PATH: "/app/certs/localhost.key", TLS_CERT_PATH: "/app/certs/localhost.crt" },
+    port: 4000,
+    execFile: async () => ({ stdout: "", stderr: "" }),
+    createHttpsServer: () => ({ listen() { return { close() {} }; } }),
+  });
+
+  assert.equal(result.protocol, "https");
+  assert.equal(calls.length, 0);
 });
 
 test("createNetworkServer enforces TLS by default in production", async () => {
