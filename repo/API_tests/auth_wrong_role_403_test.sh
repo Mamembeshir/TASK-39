@@ -1,8 +1,9 @@
 #!/bin/sh
 
 base_url="${API_BASE_URL:-http://api:4000}"
+cookie_file="/tmp/auth_wrong_role_login.cookies"
 
-login_code=$(curl -sS -o /tmp/auth_wrong_role_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
+login_code=$(curl -sS -c "$cookie_file" -o /tmp/auth_wrong_role_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
   -H "Content-Type: application/json" \
   -H "X-Device-Id: wrong-role-device" \
   -d '{"username":"customer_demo","password":"devpass123456"}')
@@ -10,8 +11,6 @@ login_code=$(curl -sS -o /tmp/auth_wrong_role_login.json -w "%{http_code}" -X PO
 if [ "$login_code" != "200" ]; then
   exit 1
 fi
-
-token=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(p.accessToken);' /tmp/auth_wrong_role_login.json)
 
 payload='{
   "title":"role check",
@@ -25,7 +24,7 @@ payload='{
 }'
 
 code=$(curl -sS -o /tmp/auth_wrong_role.json -w "%{http_code}" -X POST "$base_url/api/staff/services" \
-  -H "Authorization: Bearer $token" \
+  -b "$cookie_file" \
   -H "Content-Type: application/json" \
   -d "$payload")
 
