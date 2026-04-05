@@ -20,8 +20,8 @@ services:
       - INTERNAL_ROUTES_ENABLED=${INTERNAL_ROUTES_ENABLED:-false}
       - INTERNAL_ROUTES_TOKEN=${INTERNAL_ROUTES_TOKEN:-dev-internal-token}
       - TEST_NOW_ENABLED=true
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-dev-compose-access-secret-2026}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-dev-compose-refresh-secret-2026}
       - FIELD_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       - CORS_ALLOWLIST=https://localhost:4000,http://localhost:5173,https://localhost
       - LOG_LEVEL=info
