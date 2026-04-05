@@ -7,7 +7,7 @@ BACKEND_DIR="${BACKEND_DIR:-$(pwd)/backend}"
 if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
   if command -v docker >/dev/null 2>&1; then
     docker compose down --remove-orphans
-    NODE_ENV=test SEED_FIXTURES=true INTERNAL_ROUTES_ENABLED=true INTERNAL_ROUTES_TOKEN=dev-internal-token TRUST_PROXY_HEADERS=true TLS_ENABLED=false docker compose run --build --rm test-runner
+    NODE_ENV=test AUTH_RESPONSE_INCLUDE_TOKENS=true SEED_FIXTURES=true INTERNAL_ROUTES_ENABLED=true INTERNAL_ROUTES_TOKEN=dev-internal-token TRUST_PROXY_HEADERS=true TLS_ENABLED=false docker compose run --build --rm test-runner
     status=$?
     docker compose down --remove-orphans
     exit "$status"
@@ -149,7 +149,7 @@ run_test "Customer views are masked while staff views full contact" "./API_tests
 run_test "Admin blacklist endpoint blocks forwarded IP" "./API_tests/admin_blacklist_upsert_test.sh"
 run_test "Staff inbox messages respect role visibility" "./API_tests/inbox_staff_visibility_test.sh"
 run_test "Blacklisted IP cannot access API" "./API_tests/blacklist_ip_test.sh"
-run_test "Backend node unit and service tests" "npm --prefix ./backend run test:unit"
+run_test "Backend node unit and service tests" "NODE_ENV=test npm --prefix ./backend run test:unit"
 run_test "Unit password length validation" "./unit_tests/password_length_test.sh"
 run_test "Unit quote pricing matrix" "./unit_tests/quote_pricing_test.sh"
 run_test "Unit production errors omit stack" "./unit_tests/production_error_no_stack_test.sh"

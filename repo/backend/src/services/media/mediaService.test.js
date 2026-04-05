@@ -75,9 +75,9 @@ test("uploadMedia keeps public and private hashes in separate namespaces", async
     fs: { mkdir: async () => {}, writeFile: async () => {} },
     MAX_UPLOAD_BYTES: 10 * 1024 * 1024,
     mediaRepository: {
-      findMediaBySha256: async (sha256, storageScope) => {
-        lookups.push({ sha256, storageScope });
-        if (storageScope === "private") {
+      findMediaBySha256: async (sha256, dedupNamespace) => {
+        lookups.push({ sha256, dedupNamespace });
+        if (dedupNamespace === "review") {
           return {
             _id: { toString: () => "private-media" },
             mime: "image/png",
@@ -123,8 +123,9 @@ test("uploadMedia keeps public and private hashes in separate namespaces", async
   assert.equal(publicResult.media[0].mediaId, "public-media");
   assert.equal(publicResult.media[0].url.startsWith("/media/files/public/"), true);
   assert.equal(publicResult.media[0].url.endsWith(".png"), true);
-  assert.deepEqual(lookups.map((entry) => entry.storageScope), ["private", "public"]);
+  assert.deepEqual(lookups.map((entry) => entry.dedupNamespace), ["review", "public_asset"]);
   assert.equal(inserted[0].storageScope, "public");
+  assert.equal(inserted[0].dedupNamespace, "public_asset");
 });
 
 test("uploadMedia uses the deduped document from duplicate-key recovery", async () => {

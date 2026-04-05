@@ -19,6 +19,7 @@ if [ "$customer_login_code" != "200" ] || [ "$admin_login_code" != "200" ]; then
 fi
 
 customer_token=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(p.accessToken);' /tmp/retention_policy_customer_login.json)
+customer_token=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(p.accessToken);' /tmp/retention_policy_customer_login.json)
 admin_token=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(p.accessToken);' /tmp/retention_policy_admin_login.json)
 
 node -e '
@@ -34,8 +35,10 @@ const bytes=[
   0x00,0x00,0x00,0x49,0x45,0x4e,0x44,0xae,
   0x42,0x60,0x82
 ];
-fs.writeFileSync("/tmp/retention-policy-a.png", Buffer.from(bytes));
-fs.writeFileSync("/tmp/retention-policy-b.png", Buffer.from(bytes));
+const bytesA = bytes.concat([0x72,0x65,0x74,0x2d,0x61]);
+const bytesB = bytes.concat([0x72,0x65,0x74,0x2d,0x62]);
+fs.writeFileSync("/tmp/retention-policy-a.png", Buffer.from(bytesA));
+fs.writeFileSync("/tmp/retention-policy-b.png", Buffer.from(bytesB));
 '
 
 upload_a_code=$(curl -sS -o /tmp/retention_policy_upload_a.json -w "%{http_code}" -X POST "$base_url/api/media" \

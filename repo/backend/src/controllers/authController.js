@@ -3,6 +3,7 @@ const { logger } = require('../utils/logger');
 
 function createAuthController(deps) {
   const { authService, createError, getDatabase, getDeviceFingerprint, writeAuditLog, assessLoginRisk, ObjectId } = deps;
+  const includeCompatTokens = String(process.env.AUTH_RESPONSE_INCLUDE_TOKENS || "false").toLowerCase() === "true";
 
   function cookieOptions() {
     const secure = process.env.NODE_ENV === 'production';
@@ -40,7 +41,7 @@ function createAuthController(deps) {
         const { accessToken, refreshToken } = await authService.issueAuthTokens({ _id: result.insertedId, username, roles: ['customer'] });
         setAuthCookies(res, accessToken, refreshToken);
 
-        return res.status(201).json({ user });
+        return res.status(201).json(includeCompatTokens ? { user, accessToken, refreshToken } : { user });
       } catch (error) {
         if (error && error.code === 11000) {
           return next(createError(409, 'USERNAME_TAKEN', 'Username already exists'));
@@ -121,6 +122,7 @@ function createAuthController(deps) {
 
         return res.status(200).json({
           user: { id: user._id.toString(), username: user.username, roles: user.roles },
+          ...(includeCompatTokens ? { accessToken, refreshToken } : {}),
           securityEvent: isNewDevice
             ? {
                 type: 'new_device_login',
@@ -150,7 +152,10 @@ function createAuthController(deps) {
         }
 
         setAuthCookies(res, rotated.accessToken, rotated.refreshToken);
-        return res.status(200).json({ user: req.auth ? { id: req.auth.sub, username: req.auth.username, roles: req.auth.roles } : null });
+        return res.status(200).json({
+          user: req.auth ? { id: req.auth.sub, username: req.auth.username, roles: req.auth.roles } : null,
+          ...(includeCompatTokens ? { accessToken: rotated.accessToken, refreshToken: rotated.refreshToken } : {}),
+        });
       } catch (error) {
         return next(error);
       }

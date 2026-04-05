@@ -109,18 +109,6 @@ async function runRetentionCleanup({ logger = console, env = process.env, mediaF
         ...((ticket.immutableOutcome && ticket.immutableOutcome.attachmentIds) || []),
       ];
 
-      for (const mediaId of mediaIds) {
-        const result = await decrementAndMaybeDeleteMedia({
-          db,
-          mediaFs,
-          mediaId,
-          mediaUploadDir,
-        });
-        if (result.deletedBlob) {
-          deletedBlobs += 1;
-        }
-      }
-
       await db.collection("tickets").updateOne(
         { _id: ticket._id },
         {
@@ -132,6 +120,18 @@ async function runRetentionCleanup({ logger = console, env = process.env, mediaF
           },
         },
       );
+
+      for (const mediaId of mediaIds) {
+        const result = await decrementAndMaybeDeleteMedia({
+          db,
+          mediaFs,
+          mediaId,
+          mediaUploadDir,
+        });
+        if (result.deletedBlob) {
+          deletedBlobs += 1;
+        }
+      }
       processedTickets += 1;
     }
 

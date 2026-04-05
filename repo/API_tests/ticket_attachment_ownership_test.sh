@@ -4,8 +4,7 @@ base_url="${API_BASE_URL:-http://api:4000}"
 internal_token="${INTERNAL_ROUTES_TOKEN:-dev-internal-token}"
 internal_admin_token="${INTERNAL_ADMIN_TOKEN:-}"
 
-customer_cookie_file=/tmp/ticket_attachment_owner_customer.cookies
-customer_login_code=$(curl -sS -c "$customer_cookie_file" -o /tmp/ticket_attachment_owner_customer_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
+customer_login_code=$(curl -sS -o /tmp/ticket_attachment_owner_customer_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
   -H "Content-Type: application/json" \
   -H "X-Device-Id: ticket-attachment-customer-device" \
   -d '{"username":"customer_demo","password":"devpass123456"}')
@@ -13,13 +12,11 @@ customer_login_code=$(curl -sS -c "$customer_cookie_file" -o /tmp/ticket_attachm
 username_b="ticket_attach_user_$(date +%s)"
 password_b="ticket-attach-pass-123"
 
-register_cookie_file=/tmp/ticket_attachment_owner_register_b.cookies
-register_b_code=$(curl -sS -c "$register_cookie_file" -o /tmp/ticket_attachment_owner_register_b.json -w "%{http_code}" -X POST "$base_url/api/auth/register" \
+register_b_code=$(curl -sS -o /tmp/ticket_attachment_owner_register_b.json -w "%{http_code}" -X POST "$base_url/api/auth/register" \
   -H "Content-Type: application/json" \
   -d "{\"username\":\"$username_b\",\"password\":\"$password_b\"}")
 
-login_b_cookie_file=/tmp/ticket_attachment_owner_login_b.cookies
-login_b_code=$(curl -sS -c "$login_b_cookie_file" -o /tmp/ticket_attachment_owner_login_b.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
+login_b_code=$(curl -sS -o /tmp/ticket_attachment_owner_login_b.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
   -H "Content-Type: application/json" \
   -H "X-Device-Id: ticket-attachment-b-device" \
   -d "{\"username\":\"$username_b\",\"password\":\"$password_b\"}")
@@ -32,6 +29,8 @@ if [ "$customer_login_code" != "200" ] || [ "$register_b_code" != "201" ] || [ "
   exit 1
 fi
 
+customer_token=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(p.accessToken);' /tmp/ticket_attachment_owner_customer_login.json)
+token_b=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(p.accessToken);' /tmp/ticket_attachment_owner_login_b.json)
 order_id=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(p.orderId);' /tmp/ticket_attachment_owner_fixture.json)
 
 node -e '
@@ -47,12 +46,13 @@ const bytes=[
   0x00,0x00,0x00,0x49,0x45,0x4e,0x44,0xae,
   0x42,0x60,0x82
 ];
+bytes.push(0x74,0x69,0x63,0x6b,0x65,0x74,0x2d,0x61,0x74,0x74,0x61,0x63,0x68);
 fs.writeFileSync("/tmp/ticket-attachment-owner.png", Buffer.from(bytes));
 '
 
 upload_b_code=$(curl -sS -o /tmp/ticket_attachment_owner_upload_b.json -w "%{http_code}" -X POST "$base_url/api/media" \
-  -b "$login_b_cookie_file" \
-  -F "purpose=review" \
+  -H "Authorization: Bearer $token_b" \
+  -F "purpose=ticket" \
   -F "files=@/tmp/ticket-attachment-owner.png;type=image/png")
 
 if [ "$upload_b_code" != "201" ]; then
@@ -62,7 +62,7 @@ fi
 media_id_b=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const m=(p.media||[])[0];if(!m||!m.mediaId)process.exit(1);process.stdout.write(m.mediaId);' /tmp/ticket_attachment_owner_upload_b.json)
 
 ticket_create_code=$(curl -sS -o /tmp/ticket_attachment_owner_create.json -w "%{http_code}" -X POST "$base_url/api/tickets" \
-  -b "$customer_cookie_file" \
+  -H "Authorization: Bearer $customer_token" \
   -H "Content-Type: application/json" \
   -d "{\"orderId\":\"$order_id\",\"category\":\"billing\",\"description\":\"ownership check\",\"attachmentIds\":[\"$media_id_b\"]}")
 

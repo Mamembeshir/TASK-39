@@ -51,6 +51,10 @@ function createMediaService(deps) {
     return ["content", "public_asset"].includes(purpose) ? "public" : "private";
   }
 
+  function getDedupNamespace(purpose) {
+    return purpose;
+  }
+
   function canUploadPurpose(auth, purpose) {
     if (!["content", "public_asset"].includes(purpose)) {
       return true;
@@ -75,6 +79,7 @@ function createMediaService(deps) {
       await fs.mkdir(MEDIA_UPLOAD_DIR, { recursive: true });
       const uploaded = [];
       const storageScope = getMediaScope(purpose);
+      const dedupNamespace = getDedupNamespace(purpose);
 
       for (const file of files) {
         const declaredMime = file.mimetype;
@@ -92,7 +97,7 @@ function createMediaService(deps) {
         const processedBuffer = await maybeCompressImage(file.buffer, declaredMime, crop);
         const sha256 = crypto.createHash("sha256").update(processedBuffer).digest("hex");
 
-        const existing = await mediaRepository.findMediaBySha256(sha256, storageScope, purpose);
+        const existing = await mediaRepository.findMediaBySha256(sha256, dedupNamespace, purpose);
         if (existing) {
           const ownerId = auth?.sub ? new ObjectId(auth.sub) : null;
           await mediaRepository.incrementMediaRefCount(existing._id, ownerId);
@@ -125,6 +130,7 @@ function createMediaService(deps) {
             mime: declaredMime,
             refCount: 1,
             purpose,
+            dedupNamespace,
             storageScope,
             storagePath: scopedStoragePath,
             createdBy: ownerId,
@@ -147,7 +153,7 @@ function createMediaService(deps) {
         } catch (error) {
           if (error && error.code === 11000) {
             const ownerId = auth?.sub ? new ObjectId(auth.sub) : null;
-            const deduped = await mediaRepository.findAndIncrementBySha256(sha256, storageScope, ownerId, purpose);
+            const deduped = await mediaRepository.findAndIncrementBySha256(sha256, dedupNamespace, ownerId, purpose);
             uploaded.push({
               mediaId: deduped._id.toString(),
               sha256,

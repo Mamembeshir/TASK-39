@@ -1,10 +1,13 @@
 const { getDatabase } = require("../db");
 
-async function findMediaBySha256(sha256, storageScope = null, purpose = null) {
+async function findMediaBySha256(sha256, dedupNamespace = null, purpose = null) {
   const database = getDatabase();
   const filter = { sha256 };
-  if (storageScope) {
-    filter.$or = [{ storageScope }, { storageScope: { $exists: false }, purpose: { $in: purposeScopePurposes(storageScope, purpose) } }];
+  if (dedupNamespace) {
+    filter.$or = [
+      { dedupNamespace },
+      { dedupNamespace: { $exists: false }, purpose: dedupNamespaceFallbackPurposes(dedupNamespace, purpose) },
+    ];
   }
   return database.collection("media_metadata").findOne(filter);
 }
@@ -57,7 +60,7 @@ async function insertMedia(doc) {
   return database.collection("media_metadata").insertOne(doc);
 }
 
-async function findAndIncrementBySha256(sha256, storageScope = null, ownerId = null, purpose = null) {
+async function findAndIncrementBySha256(sha256, dedupNamespace = null, ownerId = null, purpose = null) {
   const database = getDatabase();
   const update = { $inc: { refCount: 1 }, $set: { updatedAt: new Date() } };
   if (ownerId) {
@@ -66,8 +69,11 @@ async function findAndIncrementBySha256(sha256, storageScope = null, ownerId = n
     update.$addToSet = { ownerIds: ownerId };
   }
   const filter = { sha256 };
-  if (storageScope) {
-    filter.$or = [{ storageScope }, { storageScope: { $exists: false }, purpose: { $in: purposeScopePurposes(storageScope, purpose) } }];
+  if (dedupNamespace) {
+    filter.$or = [
+      { dedupNamespace },
+      { dedupNamespace: { $exists: false }, purpose: dedupNamespaceFallbackPurposes(dedupNamespace, purpose) },
+    ];
   }
   const result = await database
     .collection("media_metadata")
@@ -79,12 +85,12 @@ async function findAndIncrementBySha256(sha256, storageScope = null, ownerId = n
   return result?.value ?? null;
 }
 
-function purposeScopePurposes(storageScope, purpose) {
-  if (storageScope === "public") {
+function dedupNamespaceFallbackPurposes(dedupNamespace, purpose) {
+  if (dedupNamespace === "public_asset" || dedupNamespace === "content") {
     return ["content", "public_asset"];
   }
-  if (storageScope === "private") {
-    return ["review", "ticket"];
+  if (dedupNamespace === "review" || dedupNamespace === "ticket") {
+    return [dedupNamespace];
   }
   return purpose ? [purpose] : [];
 }
