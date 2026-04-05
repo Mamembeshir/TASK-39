@@ -49,8 +49,8 @@ export function OpsHomePage() {
             title="Catalog setup"
             summary={`${servicesQuery.data?.length ?? 0} services are currently visible in the catalog. Use the live catalog to verify published setup.`}
             actions={[
-              { to: '/catalog', label: 'Open catalog', variant: 'secondary' },
-              { to: '/compare', label: 'Check compare flow', variant: 'ghost' },
+              { to: '/ops/catalog', label: 'Open catalog console', variant: 'secondary' },
+              { to: '/catalog', label: 'Preview catalog', variant: 'ghost' },
             ]}
           />
           <OpsCard
@@ -59,6 +59,7 @@ export function OpsHomePage() {
             actions={[
               { to: '/ops/content', label: 'Open content studio', variant: 'secondary' },
               { to: '/content', label: 'Preview published hub', variant: 'ghost' },
+              { to: '/ops/messages', label: 'Compose staff message', variant: 'ghost' },
             ]}
           />
           <OpsCard

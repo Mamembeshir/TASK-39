@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import type { ServiceDetail } from '@/features/catalog/api/catalogApi';
-import { addFavorite, removeFavorite } from '@/features/booking/api/bookingApi';
+import { addFavorite } from '@/features/booking/api/bookingApi';
 import { Button } from '@/shared/components/ui/button';
 import { toast } from 'sonner';
 
@@ -10,8 +10,7 @@ export function ServiceDetailHeader({ service }: { service: ServiceDetail }) {
       await addFavorite(service.id);
       toast.success('Added to favorites');
     } catch {
-      await removeFavorite(service.id);
-      toast.success('Removed from favorites');
+      toast.error('Unable to add to favorites');
     }
   }
 
@@ -24,7 +23,7 @@ export function ServiceDetailHeader({ service }: { service: ServiceDetail }) {
         <p className="body-base text-foreground">{service.description}</p>
         <p className="text-sm text-muted-foreground">{service.category}</p>
         <div>
-          <Button variant="secondary" onClick={handleFavorite}>Favorite</Button>
+          <Button variant="secondary" onClick={handleFavorite}>Add to favorites</Button>
         </div>
       </CardContent>
     </Card>

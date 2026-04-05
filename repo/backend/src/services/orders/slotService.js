@@ -1,29 +1,53 @@
 const { logger } = require("../../utils/logger");
 
 function createSlotService({ getDatabase }) {
-  async function releaseSlotCapacity(slotIds) {
-    if (!Array.isArray(slotIds) || slotIds.length === 0) {
+  function normalizeSlotAllocations(slotAllocations = []) {
+    if (!Array.isArray(slotAllocations)) {
+      return [];
+    }
+
+    return slotAllocations
+      .map((entry) => {
+        if (entry && typeof entry === "object" && entry.slotId) {
+          const units = Number(entry.units || 1);
+          return {
+            slotId: entry.slotId,
+            units: Number.isInteger(units) && units > 0 ? units : 1,
+          };
+        }
+        return {
+          slotId: entry,
+          units: 1,
+        };
+      })
+      .filter((entry) => Boolean(entry.slotId));
+  }
+
+  async function releaseSlotCapacity(slotAllocations) {
+    const normalized = normalizeSlotAllocations(slotAllocations);
+    if (normalized.length === 0) {
       return;
     }
 
     const database = getDatabase();
     await Promise.all(
-      slotIds.map((slotId) =>
+      normalized.map(({ slotId, units }) =>
         database
           .collection("capacity_slots")
-          .updateOne({ _id: slotId }, { $inc: { remainingCapacity: 1 }, $set: { updatedAt: new Date() } }),
+          .updateOne({ _id: slotId }, { $inc: { remainingCapacity: units }, $set: { updatedAt: new Date() } }),
       ),
     );
   }
 
-  async function findAlternativeSlots(slot, limit = 5) {
+  async function findAlternativeSlots(slot, limit = 5, requiredCapacityUnits = 1) {
+    const minimumCapacity = Number.isInteger(requiredCapacityUnits) && requiredCapacityUnits > 0 ? requiredCapacityUnits : 1;
     const database = getDatabase();
     const alternatives = await database
       .collection("capacity_slots")
       .find({
         serviceId: slot.serviceId,
         startTime: { $gte: slot.startTime },
-        remainingCapacity: { $gt: 0 },
+        remainingCapacity: { $gte: minimumCapacity },
         _id: { $ne: slot._id },
       })
       .sort({ startTime: 1 })
@@ -77,7 +101,7 @@ function createSlotService({ getDatabase }) {
         continue;
       }
 
-      await releaseSlotCapacity(order.slotIds || []);
+      await releaseSlotCapacity(order.slotAllocations || order.slotIds || []);
     }
   }
 

@@ -54,3 +54,38 @@ test("markInboxRead throws when message is not visible", async () => {
     (error) => error && error.code === 'MESSAGE_NOT_FOUND',
   );
 });
+
+test("build visibility keeps targeted messages scoped to recipient", async () => {
+  let capturedFilter = null;
+  const service = createInboxService({
+    buildInboxVisibilityFilter: (userId, roles, now) => {
+      capturedFilter = {
+        publishAt: { $lte: now },
+        $or: [
+          { recipientUserId: userId },
+          {
+            recipientUserId: null,
+            $or: [
+              { roles: { $exists: false } },
+              { roles: { $size: 0 } },
+              { roles: { $in: roles } },
+            ],
+          },
+        ],
+      };
+      return capturedFilter;
+    },
+    createError,
+    messagesRepository: {
+      listMessages: async () => [],
+    },
+  });
+
+  await service.listInbox({
+    auth: { sub: 'u1', roles: ['customer'] },
+    ObjectId: function ObjectId(value) { this.value = value; },
+  });
+
+  assert.ok(capturedFilter);
+  assert.deepEqual(capturedFilter.$or[1].recipientUserId, null);
+});

@@ -1,12 +1,19 @@
 function buildInboxVisibilityFilter(userId, roles, now) {
+  const roleValues = Array.isArray(roles) ? roles : [];
+
   return {
     publishAt: { $lte: now },
     $or: [
       { recipientUserId: userId },
-      { roles: { $exists: false } },
-      { roles: { $size: 0 } },
-      { roles: { $in: roles } },
-      { roleTargets: { $in: roles } },
+      {
+        recipientUserId: null,
+        $or: [
+          { roles: { $exists: false } },
+          { roles: { $size: 0 } },
+          { roles: { $in: roleValues } },
+          { roleTargets: { $in: roleValues } },
+        ],
+      },
     ],
   };
 }

@@ -10,6 +10,14 @@ coverage/
 .env.*
 !.env.example
 
+# local tls material
+certs/*.key
+certs/*.pem
+certs/*.p12
+certs/*.pfx
+certs/*.crt
+!certs/README.md
+
 # editor / local tooling
 .vscode/
 .idea/

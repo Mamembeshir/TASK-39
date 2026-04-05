@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getService, getServiceQuestions, getServiceReviews, type ServiceBundle } from '@/features/catalog/api/catalogApi';
-import { addFavorite, listQuoteJurisdictions, listQuoteSlots, removeFavorite } from '@/features/booking/api/bookingApi';
+import { addFavorite, listQuoteJurisdictions, listQuoteSlots } from '@/features/booking/api/bookingApi';
 import { QuestionsSection } from '@/features/catalog/components/QuestionsSection';
 import { ReviewsSection } from '@/features/catalog/components/ReviewsSection';
 import { ServiceDetailHeader } from '@/features/catalog/components/ServiceDetailHeader';
@@ -144,8 +144,7 @@ export function ServiceDetailPage() {
       await addFavorite(id);
       toast.success('Added to favorites');
     } catch {
-      await removeFavorite(id);
-      toast.success('Removed from favorites');
+      toast.error('Unable to add to favorites');
     }
   }
 
@@ -176,7 +175,7 @@ export function ServiceDetailPage() {
         <div className="flex flex-wrap gap-3">
           <Button onClick={handleQuote}>Quote</Button>
           <Button variant="secondary" onClick={() => navigate('/compare')}>Compare</Button>
-          <Button variant="ghost" onClick={handleFavorite}>Favorite</Button>
+          <Button variant="ghost" onClick={handleFavorite}>Add to favorites</Button>
         </div>
 
         <Tabs>

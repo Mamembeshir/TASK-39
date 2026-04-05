@@ -23,6 +23,8 @@ openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 365 \
   -subj "/CN=localhost"
 ```
 
+Note: generated cert/key files are intentionally not committed; see `certs/README.md`.
+
 ```bash
 docker compose up --build
 ```

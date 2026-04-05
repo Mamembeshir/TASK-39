@@ -46,6 +46,23 @@ export type ServiceReview = {
   verified?: boolean;
 };
 
+export type StaffServicePayload = {
+  title: string;
+  description: string;
+  category: string;
+  basePrice: number;
+  durationMinutes: number;
+  tags: string[];
+  addOns: string[];
+};
+
+export type StaffBundlePayload = {
+  title: string;
+  description: string;
+  serviceIds: string[];
+  discountPercent: number;
+};
+
 export type CatalogFilters = {
   category?: string;
   tags?: string;
@@ -105,4 +122,52 @@ export function rejectQuestion(id: string) {
 
 export function getServiceReviews(id: string) {
   return client.request<ServiceReviewsResponse>({ method: 'GET', path: `/api/services/${id}/reviews` }).then((response) => (Array.isArray(response?.reviews) ? response.reviews : []));
+}
+
+export function createStaffService(payload: StaffServicePayload) {
+  return client.withAuth().request<{ id: string }>({
+    method: 'POST',
+    path: '/api/staff/services',
+    body: payload,
+  });
+}
+
+export function updateStaffService(id: string, payload: Partial<StaffServicePayload>) {
+  return client.withAuth().request<{ status: string }>({
+    method: 'PATCH',
+    path: `/api/staff/services/${id}`,
+    body: payload,
+  });
+}
+
+export function publishStaffService(id: string) {
+  return client.withAuth().request<{ status: string }>({ method: 'POST', path: `/api/staff/services/${id}/publish` });
+}
+
+export function unpublishStaffService(id: string) {
+  return client.withAuth().request<{ status: string }>({ method: 'POST', path: `/api/staff/services/${id}/unpublish` });
+}
+
+export function createStaffBundle(payload: StaffBundlePayload) {
+  return client.withAuth().request<{ id: string }>({
+    method: 'POST',
+    path: '/api/staff/bundles',
+    body: payload,
+  });
+}
+
+export function updateStaffBundle(id: string, payload: Partial<StaffBundlePayload>) {
+  return client.withAuth().request<{ status: string }>({
+    method: 'PATCH',
+    path: `/api/staff/bundles/${id}`,
+    body: payload,
+  });
+}
+
+export function publishStaffBundle(id: string) {
+  return client.withAuth().request<{ status: string }>({ method: 'POST', path: `/api/staff/bundles/${id}/publish` });
+}
+
+export function unpublishStaffBundle(id: string) {
+  return client.withAuth().request<{ status: string }>({ method: 'POST', path: `/api/staff/bundles/${id}/unpublish` });
 }

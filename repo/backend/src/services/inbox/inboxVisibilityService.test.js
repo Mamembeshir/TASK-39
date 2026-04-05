@@ -11,10 +11,15 @@ test("buildInboxVisibilityFilter includes publishAt cutoff and visibility clause
     publishAt: { $lte: now },
     $or: [
       { recipientUserId: "user-1" },
-      { roles: { $exists: false } },
-      { roles: { $size: 0 } },
-      { roles: { $in: ["moderator", "administrator"] } },
-      { roleTargets: { $in: ["moderator", "administrator"] } },
+      {
+        recipientUserId: null,
+        $or: [
+          { roles: { $exists: false } },
+          { roles: { $size: 0 } },
+          { roles: { $in: ["moderator", "administrator"] } },
+          { roleTargets: { $in: ["moderator", "administrator"] } },
+        ],
+      },
     ],
   });
 });

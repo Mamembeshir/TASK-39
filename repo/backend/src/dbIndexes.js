@@ -28,9 +28,10 @@ async function ensureIndexes(database) {
   await database
     .collection("compare_lists")
     .createIndex({ userId: 1 }, { unique: true, name: "uniq_compare_per_user" });
+  await dropIndexIfExists("media_metadata", "uniq_media_sha256");
   await database
     .collection("media_metadata")
-    .createIndex({ sha256: 1 }, { unique: true, name: "uniq_media_sha256" });
+    .createIndex({ storageScope: 1, sha256: 1 }, { unique: true, name: "uniq_media_scope_sha256" });
   await database.collection("content_versions").createIndex({ slug: 1 }, { unique: true, name: "uniq_content_slug" });
   await database
     .collection("services")

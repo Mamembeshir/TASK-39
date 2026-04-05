@@ -427,6 +427,7 @@ async function seedDatabase(database) {
       mime: "image/jpeg",
       refCount: 2,
       purpose: "review",
+      storageScope: "private",
       createdAt: now,
       updatedAt: now,
     },

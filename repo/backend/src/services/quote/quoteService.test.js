@@ -1,54 +1,79 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createQuoteSignature } = require("./quoteService");
+const { createQuoteService } = require("./quoteService");
 
-test("createQuoteSignature is stable for equivalent quotes regardless of breakdown fields", () => {
-  const quoteA = {
-    itemizedLines: [
-      {
-        type: "bundle",
-        bundleId: "bundle-1",
-        quantity: 1,
-        durationMinutes: 90,
-        unitPrice: 216,
-        lineTotal: 216,
-        breakdown: { ignored: true },
+function createError(status, code, message) {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  return error;
+}
+
+test("buildQuoteFromRequestPayload ignores client booking timestamp for pricing", async () => {
+  const now = new Date();
+  const service = createQuoteService({
+    calculateQuote: ({ bookingRequestedAt }) => ({ bookingRequestedAt }),
+    createError,
+    getDatabase: () => ({
+      collection() {
+        return {
+          async findOne() {
+            return { _id: "US-CA", taxRequired: false, taxRate: 0 };
+          },
+          find() {
+            return { toArray: async () => [] };
+          },
+        };
       },
-    ],
-    travel: { milesFromDepot: 5, band: "0-10", fee: 0 },
-    totals: { laborSubtotal: 216, travelFee: 0, tax: 0, total: 216 },
-    jurisdiction: { id: "US-OR-PDX", taxRequired: false, taxRate: 0 },
-    notServiceable: false,
-    code: "OK",
-  };
+    }),
+    parseObjectIdOrNull: (value) => value,
+  });
 
-  const quoteB = {
-    ...quoteA,
-    itemizedLines: [
-      {
-        ...quoteA.itemizedLines[0],
-        breakdown: { different: "value" },
-      },
-    ],
-  };
+  const result = await service.buildQuoteFromRequestPayload({
+    lineItems: [],
+    slotStart: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+    bookingRequestedAt: new Date("2000-01-01T00:00:00.000Z").toISOString(),
+    milesFromDepot: 5,
+    jurisdictionId: "US-CA",
+    sameDayPriority: true,
+    taxEnabled: true,
+  });
 
-  assert.equal(createQuoteSignature(quoteA), createQuoteSignature(quoteB));
+  const resultDate = new Date(result.bookingRequestedAt);
+  assert.ok(Math.abs(resultDate.getTime() - now.getTime()) < 5000);
 });
 
-test("createQuoteSignature changes when priced fields change", () => {
-  const quoteA = {
-    itemizedLines: [{ type: "service", serviceId: "svc-1", quantity: 1, durationMinutes: 30, unitPrice: 80, lineTotal: 80 }],
-    travel: { milesFromDepot: 5, band: "0-10", fee: 0 },
-    totals: { laborSubtotal: 80, travelFee: 0, tax: 0, total: 80 },
-    jurisdiction: { id: "US-OR-PDX", taxRequired: false, taxRate: 0 },
-    notServiceable: false,
-    code: "OK",
-  };
-  const quoteB = {
-    ...quoteA,
-    totals: { ...quoteA.totals, total: 95 },
-  };
+test("buildQuoteFromRequestPayload rejects invalid bookingRequestedAt when provided", async () => {
+  const service = createQuoteService({
+    calculateQuote: () => ({}),
+    createError,
+    getDatabase: () => ({
+      collection() {
+        return {
+          async findOne() {
+            return { _id: "US-CA", taxRequired: false, taxRate: 0 };
+          },
+          find() {
+            return { toArray: async () => [] };
+          },
+        };
+      },
+    }),
+    parseObjectIdOrNull: (value) => value,
+  });
 
-  assert.notEqual(createQuoteSignature(quoteA), createQuoteSignature(quoteB));
+  await assert.rejects(
+    () =>
+      service.buildQuoteFromRequestPayload({
+        lineItems: [],
+        slotStart: new Date().toISOString(),
+        bookingRequestedAt: "not-a-date",
+        milesFromDepot: 5,
+        jurisdictionId: "US-CA",
+        sameDayPriority: false,
+        taxEnabled: true,
+      }),
+    (error) => error && error.code === "INVALID_BOOKING_REQUESTED_AT",
+  );
 });

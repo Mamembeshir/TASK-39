@@ -94,13 +94,21 @@ function createQuoteService({ calculateQuote, createError, getDatabase, parseObj
       const servicesById = Object.fromEntries(services.map((service) => [service._id.toString(), service]));
       const bundlesById = Object.fromEntries(bundles.map((bundle) => [bundle._id.toString(), bundle]));
 
+      const serverBookingRequestedAt = new Date();
+      if (bookingRequestedAt) {
+        const requestedAt = new Date(bookingRequestedAt);
+        if (Number.isNaN(requestedAt.getTime())) {
+          throw createError(400, "INVALID_BOOKING_REQUESTED_AT", "bookingRequestedAt must be a valid ISO datetime");
+        }
+      }
+
       try {
         return calculateQuote({
           lineItems,
           servicesById,
           bundlesById,
           slotStart,
-          bookingRequestedAt,
+          bookingRequestedAt: serverBookingRequestedAt.toISOString(),
           milesFromDepot: Number(milesFromDepot),
           jurisdiction,
           organizationTimezone: settings?.organizationTimezone || "America/Los_Angeles",

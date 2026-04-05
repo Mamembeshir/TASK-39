@@ -3,8 +3,9 @@
 base_url="${API_BASE_URL:-http://api:4000}"
 internal_token="${INTERNAL_ROUTES_TOKEN:-dev-internal-token}"
 internal_admin_token="${INTERNAL_ADMIN_TOKEN:-}"
+cookie_file="/tmp/order_concurrency.cookies"
 
-login_code=$(curl -sS -o /tmp/order_concurrency_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
+login_code=$(curl -sS -c "$cookie_file" -o /tmp/order_concurrency_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
   -H "Content-Type: application/json" \
   -H "X-Device-Id: order-concurrency-device" \
   -d '{"username":"customer_demo","password":"devpass123456"}')
@@ -12,8 +13,6 @@ login_code=$(curl -sS -o /tmp/order_concurrency_login.json -w "%{http_code}" -X 
 if [ "$login_code" != "200" ]; then
   exit 1
 fi
-
-token=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!p.accessToken) process.exit(1);process.stdout.write(p.accessToken);' /tmp/order_concurrency_login.json)
 
 fixture_code=$(curl -sS -o /tmp/order_concurrency_fixture.json -w "%{http_code}" -X POST "$base_url/api/internal/test-fixtures/booking-slot" \
   -H "X-Internal-Token: $internal_token" \
@@ -40,7 +39,7 @@ EOF
 )
 
 quote_code=$(curl -sS -o /tmp/order_concurrency_quote.json -w "%{http_code}" -X POST "$base_url/api/quote" \
-  -H "Authorization: Bearer $token" \
+  -b "$cookie_file" \
   -H "Content-Type: application/json" \
   -d "$quote_payload")
 
@@ -66,14 +65,14 @@ EOF
 
 (
   curl -sS -o /tmp/order_concurrency_a.json -w "%{http_code}" -X POST "$base_url/api/orders" \
-    -H "Authorization: Bearer $token" \
+    -b "$cookie_file" \
     -H "Content-Type: application/json" \
     -d "$order_payload" > /tmp/order_concurrency_a.code
 ) &
 
 (
   curl -sS -o /tmp/order_concurrency_b.json -w "%{http_code}" -X POST "$base_url/api/orders" \
-    -H "Authorization: Bearer $token" \
+    -b "$cookie_file" \
     -H "Content-Type: application/json" \
     -d "$order_payload" > /tmp/order_concurrency_b.code
 ) &

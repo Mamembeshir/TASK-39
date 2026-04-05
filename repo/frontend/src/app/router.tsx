@@ -34,6 +34,8 @@ const InboxPage = lazy(async () => ({ default: (await import('@/features/inbox/p
 const SearchPage = lazy(async () => ({ default: (await import('@/features/search/pages/SearchPage')).SearchPage }));
 const AdminHomePage = lazy(async () => ({ default: (await import('@/features/admin/pages/AdminHomePage')).AdminHomePage }));
 const OpsHomePage = lazy(async () => ({ default: (await import('@/features/ops/pages/OpsHomePage')).OpsHomePage }));
+const OpsCatalogPage = lazy(async () => ({ default: (await import('@/features/ops/pages/OpsCatalogPage')).OpsCatalogPage }));
+const OpsMessagesPage = lazy(async () => ({ default: (await import('@/features/ops/pages/OpsMessagesPage')).OpsMessagesPage }));
 const OpsSlotsPage = lazy(async () => ({ default: (await import('@/features/ops/pages/OpsSlotsPage')).OpsSlotsPage }));
 const ModHomePage = lazy(async () => ({ default: (await import('@/features/mod-console/pages/ModHomePage')).ModHomePage }));
 
@@ -155,6 +157,14 @@ export const router = createBrowserRouter([
           {
             path: 'ops/slots',
             element: <RoleGate roles={['service_manager', 'administrator']}><OpsSlotsPage /></RoleGate>,
+          },
+          {
+            path: 'ops/catalog',
+            element: <RoleGate roles={['service_manager', 'administrator']}><OpsCatalogPage /></RoleGate>,
+          },
+          {
+            path: 'ops/messages',
+            element: <RoleGate roles={['service_manager', 'administrator']}><OpsMessagesPage /></RoleGate>,
           },
           {
             path: 'mod',

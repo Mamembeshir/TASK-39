@@ -1,8 +1,12 @@
 const { getDatabase } = require("../db");
 
-async function findMediaBySha256(sha256) {
+async function findMediaBySha256(sha256, storageScope = null, purpose = null) {
   const database = getDatabase();
-  return database.collection("media_metadata").findOne({ sha256 });
+  const filter = { sha256 };
+  if (storageScope) {
+    filter.$or = [{ storageScope }, { storageScope: { $exists: false }, purpose: { $in: purposeScopePurposes(storageScope, purpose) } }];
+  }
+  return database.collection("media_metadata").findOne(filter);
 }
 
 async function incrementMediaRefCount(mediaId, ownerId = null) {
@@ -31,7 +35,8 @@ async function decrementMediaRefCount(mediaId, ownerId = null) {
     ];
   }
 
-  return database.collection("media_metadata").findOneAndUpdate(filter, update, { returnDocument: "after" });
+  const result = await database.collection("media_metadata").findOneAndUpdate(filter, update, { returnDocument: "after" });
+  return result?.value ?? null;
 }
 
 async function cleanupMediaOwnerRef(mediaId, ownerId) {
@@ -52,7 +57,7 @@ async function insertMedia(doc) {
   return database.collection("media_metadata").insertOne(doc);
 }
 
-async function findAndIncrementBySha256(sha256, ownerId = null) {
+async function findAndIncrementBySha256(sha256, storageScope = null, ownerId = null, purpose = null) {
   const database = getDatabase();
   const update = { $inc: { refCount: 1 }, $set: { updatedAt: new Date() } };
   if (ownerId) {
@@ -60,13 +65,28 @@ async function findAndIncrementBySha256(sha256, ownerId = null) {
     update.$inc[`ownerRefs.${ownerKey}`] = 1;
     update.$addToSet = { ownerIds: ownerId };
   }
-  return database
+  const filter = { sha256 };
+  if (storageScope) {
+    filter.$or = [{ storageScope }, { storageScope: { $exists: false }, purpose: { $in: purposeScopePurposes(storageScope, purpose) } }];
+  }
+  const result = await database
     .collection("media_metadata")
     .findOneAndUpdate(
-      { sha256 },
+      filter,
       update,
       { returnDocument: "after" },
     );
+  return result?.value ?? null;
+}
+
+function purposeScopePurposes(storageScope, purpose) {
+  if (storageScope === "public") {
+    return ["content", "public_asset"];
+  }
+  if (storageScope === "private") {
+    return ["review", "ticket"];
+  }
+  return purpose ? [purpose] : [];
 }
 
 async function findMediaById(mediaId) {

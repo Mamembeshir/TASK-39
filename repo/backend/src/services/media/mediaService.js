@@ -47,6 +47,19 @@ function createMediaService(deps) {
     return getOwnedRefCount(media, actorId) > 0;
   }
 
+  function getMediaScope(purpose) {
+    return ["content", "public_asset"].includes(purpose) ? "public" : "private";
+  }
+
+  function canUploadPurpose(auth, purpose) {
+    if (!["content", "public_asset"].includes(purpose)) {
+      return true;
+    }
+
+    const roles = Array.isArray(auth?.roles) ? auth.roles : [];
+    return roles.some((role) => ["administrator", "service_manager", "moderator"].includes(role));
+  }
+
   return {
     uploadMedia: async ({ auth, crop, files, purpose }) => {
       if (!Array.isArray(files) || files.length === 0) {
@@ -55,9 +68,13 @@ function createMediaService(deps) {
       if (!["review", "ticket", "content", "public_asset"].includes(purpose)) {
         throw createError(400, "INVALID_PURPOSE", "purpose must be one of review, ticket, content, public_asset");
       }
+      if (!canUploadPurpose(auth, purpose)) {
+        throw createError(403, "FORBIDDEN_MEDIA_PURPOSE", "Only privileged staff can upload content or public assets");
+      }
 
       await fs.mkdir(MEDIA_UPLOAD_DIR, { recursive: true });
       const uploaded = [];
+      const storageScope = getMediaScope(purpose);
 
       for (const file of files) {
         const declaredMime = file.mimetype;
@@ -75,7 +92,7 @@ function createMediaService(deps) {
         const processedBuffer = await maybeCompressImage(file.buffer, declaredMime, crop);
         const sha256 = crypto.createHash("sha256").update(processedBuffer).digest("hex");
 
-        const existing = await mediaRepository.findMediaBySha256(sha256);
+        const existing = await mediaRepository.findMediaBySha256(sha256, storageScope, purpose);
         if (existing) {
           const ownerId = auth?.sub ? new ObjectId(auth.sub) : null;
           await mediaRepository.incrementMediaRefCount(existing._id, ownerId);
@@ -85,7 +102,7 @@ function createMediaService(deps) {
             mime: existing.mime,
             byteSize: existing.byteSize,
             deduplicated: true,
-            url: ["public_asset", "content"].includes(existing.purpose)
+            url: (existing.storageScope || getMediaScope(existing.purpose)) === "public"
               ? `/media/files/${existing.storagePath}`
               : `/api/media/files/${existing._id.toString()}`,
           });
@@ -94,7 +111,6 @@ function createMediaService(deps) {
 
         const extension = ALLOWED_MEDIA_MIME[declaredMime];
         const fileName = `${sha256}.${extension}`;
-        const storageScope = ["content", "public_asset"].includes(purpose) ? "public" : "private";
         const scopedStoragePath = path.join(storageScope, fileName);
         const fullStoragePath = path.join(MEDIA_UPLOAD_DIR, scopedStoragePath);
         await fs.mkdir(path.dirname(fullStoragePath), { recursive: true });
@@ -109,6 +125,7 @@ function createMediaService(deps) {
             mime: declaredMime,
             refCount: 1,
             purpose,
+            storageScope,
             storagePath: scopedStoragePath,
             createdBy: ownerId,
             ownerIds: ownerId ? [ownerId] : [],
@@ -123,21 +140,21 @@ function createMediaService(deps) {
             mime: declaredMime,
             byteSize: processedBuffer.length,
             deduplicated: false,
-            url: ["content", "public_asset"].includes(purpose)
+            url: storageScope === "public"
               ? `/media/files/${scopedStoragePath}`
               : `/api/media/files/${insert.insertedId.toString()}`,
           });
         } catch (error) {
           if (error && error.code === 11000) {
             const ownerId = auth?.sub ? new ObjectId(auth.sub) : null;
-            const deduped = await mediaRepository.findAndIncrementBySha256(sha256, ownerId);
+            const deduped = await mediaRepository.findAndIncrementBySha256(sha256, storageScope, ownerId, purpose);
             uploaded.push({
               mediaId: deduped._id.toString(),
               sha256,
               mime: deduped.mime,
               byteSize: deduped.byteSize,
               deduplicated: true,
-              url: ["public_asset", "content"].includes(deduped.purpose)
+              url: (deduped.storageScope || getMediaScope(deduped.purpose)) === "public"
                 ? `/media/files/${deduped.storagePath}`
                 : `/api/media/files/${deduped._id.toString()}`,
             });

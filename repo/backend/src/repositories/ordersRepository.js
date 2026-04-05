@@ -30,22 +30,24 @@ async function deleteCapacitySlot(slotId) {
   return database.collection("capacity_slots").deleteOne({ _id: slotId });
 }
 
-async function decrementCapacitySlot(slotId) {
+async function decrementCapacitySlot(slotId, requiredCapacityUnits = 1) {
   const database = getDatabase();
+  const units = Number.isInteger(requiredCapacityUnits) && requiredCapacityUnits > 0 ? requiredCapacityUnits : 1;
   return database
     .collection("capacity_slots")
     .findOneAndUpdate(
-      { _id: slotId, remainingCapacity: { $gt: 0 } },
-      { $inc: { remainingCapacity: -1 }, $set: { updatedAt: new Date() } },
+      { _id: slotId, remainingCapacity: { $gte: units } },
+      { $inc: { remainingCapacity: -units }, $set: { updatedAt: new Date() } },
       { returnDocument: "after" },
     );
 }
 
-async function incrementCapacitySlot(slotId) {
+async function incrementCapacitySlot(slotId, requiredCapacityUnits = 1) {
   const database = getDatabase();
+  const units = Number.isInteger(requiredCapacityUnits) && requiredCapacityUnits > 0 ? requiredCapacityUnits : 1;
   return database
     .collection("capacity_slots")
-    .updateOne({ _id: slotId }, { $inc: { remainingCapacity: 1 }, $set: { updatedAt: new Date() } });
+    .updateOne({ _id: slotId }, { $inc: { remainingCapacity: units }, $set: { updatedAt: new Date() } });
 }
 
 async function findSettings() {

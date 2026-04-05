@@ -1,8 +1,9 @@
 #!/bin/sh
 
 base_url="${API_BASE_URL:-http://api:4000}"
+cookie_file="/tmp/media_dedup.cookies"
 
-login_code=$(curl -sS -o /tmp/media_dedup_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
+login_code=$(curl -sS -c "$cookie_file" -o /tmp/media_dedup_login.json -w "%{http_code}" -X POST "$base_url/api/auth/login" \
   -H "Content-Type: application/json" \
   -H "X-Device-Id: media-dedup-device" \
   -d '{"username":"customer_demo","password":"devpass123456"}')
@@ -10,8 +11,6 @@ login_code=$(curl -sS -o /tmp/media_dedup_login.json -w "%{http_code}" -X POST "
 if [ "$login_code" != "200" ]; then
   exit 1
 fi
-
-token=$(node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(!p.accessToken) process.exit(1);process.stdout.write(p.accessToken);' /tmp/media_dedup_login.json)
 
 node -e '
 const fs=require("fs");
@@ -30,12 +29,12 @@ fs.writeFileSync("/tmp/dedup.png", Buffer.from(bytes));
 '
 
 first_code=$(curl -sS -o /tmp/media_dedup_first.json -w "%{http_code}" -X POST "$base_url/api/media" \
-  -H "Authorization: Bearer $token" \
+  -b "$cookie_file" \
   -F "purpose=review" \
   -F "files=@/tmp/dedup.png;type=image/png")
 
 second_code=$(curl -sS -o /tmp/media_dedup_second.json -w "%{http_code}" -X POST "$base_url/api/media" \
-  -H "Authorization: Bearer $token" \
+  -b "$cookie_file" \
   -F "purpose=review" \
   -F "files=@/tmp/dedup.png;type=image/png")
 

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Button } from '@/shared/components/ui/button';
 import type { ServiceSummary } from '@/features/catalog/api/catalogApi';
 import { useBooking } from '@/features/booking/store';
-import { addFavorite, removeFavorite } from '@/features/booking/api/bookingApi';
+import { addFavorite } from '@/features/booking/api/bookingApi';
 import { toast } from 'sonner';
 
 export function ServiceCard({ service }: { service: ServiceSummary }) {
@@ -15,8 +15,7 @@ export function ServiceCard({ service }: { service: ServiceSummary }) {
       await addFavorite(service.id);
       toast.success('Added to favorites');
     } catch {
-      await removeFavorite(service.id);
-      toast.success('Removed from favorites');
+      toast.error('Unable to add to favorites');
     }
   }
 
@@ -48,7 +47,7 @@ export function ServiceCard({ service }: { service: ServiceSummary }) {
             <Link to={`/services/${service.id}`}>View details</Link>
           </Button>
           <Button variant="ghost" onClick={() => void handleToggleCompare()}>{isCompared ? 'Remove compare' : 'Compare'}</Button>
-          <Button variant="ghost" onClick={handleFavorite}>Favorite</Button>
+          <Button variant="ghost" onClick={handleFavorite}>Add to favorites</Button>
         </div>
       </CardContent>
     </Card>

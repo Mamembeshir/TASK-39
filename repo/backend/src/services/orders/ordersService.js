@@ -43,6 +43,44 @@ function createOrdersService(deps) {
     return ids;
   }
 
+  function parsePositiveInt(value, fallback = 1) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    const int = Math.trunc(parsed);
+    return int > 0 ? int : fallback;
+  }
+
+  function deriveRequiredCapacityUnits(lineItems = []) {
+    let totalUnits = 0;
+
+    for (const item of lineItems) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+
+      const quantity = parsePositiveInt(item.quantity, 1);
+      if (item.type === "service") {
+        const headcount = parsePositiveInt(item.spec?.headcount, 1);
+        totalUnits += headcount * quantity;
+        continue;
+      }
+
+      if (item.type === "bundle") {
+        const specs = Array.isArray(item.specs) ? item.specs : [];
+        const maxHeadcount = specs.reduce((max, spec) => {
+          const fromTopLevel = parsePositiveInt(spec?.headcount, 1);
+          const fromNested = parsePositiveInt(spec?.spec?.headcount, 1);
+          return Math.max(max, fromTopLevel, fromNested);
+        }, 1);
+        totalUnits += maxHeadcount * quantity;
+      }
+    }
+
+    return totalUnits > 0 ? totalUnits : 1;
+  }
+
   async function listCapacitySlots() {
     const slots = await ordersRepository.listCapacitySlots();
     return slots.map((slot) => ({
@@ -128,12 +166,13 @@ function createOrdersService(deps) {
     if (!slotServiceId || !requestedServiceIds.includes(slotServiceId)) {
       const preferredServiceId = requestedServiceIds[0] || null;
       const preferredServiceObjectId = preferredServiceId ? parseObjectIdOrNull(preferredServiceId) : null;
+      const requiredCapacityUnits = deriveRequiredCapacityUnits(lineItems);
       const alternatives = preferredServiceObjectId
         ? await findAlternativeSlots({
             _id: parsedSlotId,
             serviceId: preferredServiceObjectId,
             startTime: slot.startTime,
-          })
+          }, 5, requiredCapacityUnits)
         : [];
 
       return {
@@ -147,10 +186,11 @@ function createOrdersService(deps) {
     }
 
     const slotStartIso = new Date(slot.startTime).toISOString();
+    const serverBookingRequestedAt = new Date();
     const quote = await buildQuoteFromRequestPayload({
       lineItems,
       slotStart: slotStartIso,
-      bookingRequestedAt,
+      bookingRequestedAt: serverBookingRequestedAt.toISOString(),
       milesFromDepot,
       jurisdictionId,
       sameDayPriority,
@@ -191,15 +231,17 @@ function createOrdersService(deps) {
       };
     }
 
-    const decrementedSlot = await ordersRepository.decrementCapacitySlot(parsedSlotId);
+    const requiredCapacityUnits = deriveRequiredCapacityUnits(lineItems);
+    const decrementedSlot = await ordersRepository.decrementCapacitySlot(parsedSlotId, requiredCapacityUnits);
     if (!decrementedSlot) {
-      const alternatives = await findAlternativeSlots(slot);
+      const alternatives = await findAlternativeSlots(slot, 5, requiredCapacityUnits);
       return {
         status: 409,
         body: {
           code: "SLOT_UNAVAILABLE",
           message: "Requested slot is no longer available",
           alternatives,
+          requiredCapacityUnits,
         },
       };
     }
@@ -215,10 +257,11 @@ function createOrdersService(deps) {
         state: "pending_confirmation",
         lineItems,
         slotIds: [parsedSlotId],
+        slotAllocations: [{ slotId: parsedSlotId, units: requiredCapacityUnits }],
         quoteSnapshot: quote,
         quoteSignature: computedSignature,
         pricingSnapshot: quote.totals,
-        bookingRequestedAt: new Date(bookingRequestedAt),
+        bookingRequestedAt: serverBookingRequestedAt,
         slotStart: new Date(slot.startTime),
         milesFromDepot: Number(milesFromDepot),
         jurisdictionId,
@@ -238,7 +281,7 @@ function createOrdersService(deps) {
         },
       };
     } catch (error) {
-      await ordersRepository.incrementCapacitySlot(parsedSlotId);
+      await ordersRepository.incrementCapacitySlot(parsedSlotId, requiredCapacityUnits);
       throw error;
     }
   }
@@ -308,7 +351,7 @@ function createOrdersService(deps) {
       throw createError(409, "INVALID_ORDER_STATE", "Order could not be cancelled");
     }
 
-    await releaseSlotCapacity(order.slotIds || []);
+    await releaseSlotCapacity(order.slotAllocations || order.slotIds || []);
     await writeAuditLog({
       username: auth?.username,
       userId: auth?.sub ? new ObjectId(auth.sub) : null,
