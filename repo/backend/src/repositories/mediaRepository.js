@@ -31,10 +31,13 @@ async function decrementMediaRefCount(mediaId, ownerId = null) {
   if (ownerId) {
     const ownerKey = ownerId.toString();
     update.$inc[`ownerRefs.${ownerKey}`] = -1;
+    // createdBy is intentionally excluded: cleanupMediaOwnerRef removes the actor
+    // from ownerIds but never touches createdBy, so including createdBy here would
+    // allow a creator to keep decrementing the shared refCount after their stake
+    // has been fully revoked (IDOR).
     filter.$or = [
       { [`ownerRefs.${ownerKey}`]: { $gt: 0 } },
       { ownerIds: ownerId },
-      { createdBy: ownerId },
     ];
   }
 

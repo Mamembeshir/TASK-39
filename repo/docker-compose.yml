@@ -24,7 +24,7 @@ services:
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-dev-compose-access-secret-2026}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-dev-compose-refresh-secret-2026}
       - FIELD_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-      - CORS_ALLOWLIST=https://localhost:4000,http://localhost:5173,https://localhost
+      - CORS_ALLOWLIST=https://localhost:4000,http://localhost:5173,https://localhost,http://frontend-pw:5173
       - LOG_LEVEL=info
       - MEDIA_UPLOAD_DIR=/data/uploads
       - MEDIA_ENABLE_PROCESSING=false
@@ -68,12 +68,50 @@ services:
     ports:
       - "5173:5173"
 
+  # Separate Vite dev-server for Playwright: proxies /api/* to the backend so
+  # the browser never needs to resolve https://localhost:4000.
+  frontend-pw:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      # Point client to this container's own origin; Vite proxy handles /api/*
+      - VITE_API_BASE_URL=http://frontend-pw:5173
+      # vite.config.ts reads this env var to enable the /api proxy
+      - API_PROXY_TARGET=http://api:4000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5173 >/dev/null || exit 1"]
+      start_period: 20s
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  playwright:
+    build:
+      context: .
+      dockerfile: frontend/tests/e2e/Dockerfile
+    environment:
+      - FRONTEND_URL=http://frontend-pw:5173
+    depends_on:
+      frontend-pw:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      # Wait for the unit + API test pass to finish successfully before the E2E
+      # pass runs, so a single `docker compose up` drives the whole pipeline.
+      test-runner:
+        condition: service_completed_successfully
+
   test-runner:
     build:
       context: .
       dockerfile: test-runner/Dockerfile
     environment:
       - API_BASE_URL=http://api:4000
+      - INTERNAL_ROUTES_ENABLED=${INTERNAL_ROUTES_ENABLED:-false}
       - INTERNAL_ROUTES_TOKEN=${INTERNAL_ROUTES_TOKEN:-dev-internal-token}
       - TEST_MONGO_URI=mongodb://mongodb:27017/homecareops_test
       - FRONTEND_DIR=/workspace/frontend

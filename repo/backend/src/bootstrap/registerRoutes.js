@@ -281,13 +281,22 @@ function registerRoutes(deps) {
 
   if (process.env.INTERNAL_ROUTES_ENABLED === "true") {
     if (process.env.NODE_ENV !== "test") {
-      throw new Error("INTERNAL_ROUTES_ENABLED=true is only allowed when NODE_ENV=test");
+      throw new Error(
+        `INTERNAL_ROUTES_ENABLED=true is only allowed when NODE_ENV=test (got NODE_ENV=${process.env.NODE_ENV || "<unset>"})`,
+      );
     }
 
     const internalRoutesToken = process.env.INTERNAL_ROUTES_TOKEN;
-    if (!internalRoutesToken) {
-      throw new Error("INTERNAL_ROUTES_ENABLED=true requires INTERNAL_ROUTES_TOKEN");
+    if (!internalRoutesToken || internalRoutesToken.length < 16) {
+      throw new Error(
+        "INTERNAL_ROUTES_ENABLED=true requires INTERNAL_ROUTES_TOKEN of at least 16 characters",
+      );
     }
+
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[security] internal fixture routes mounted at /api/internal (NODE_ENV=test only)",
+    );
 
     const requireInternalToken = (req, res, next) => {
       const provided = req.headers["x-internal-token"];

@@ -8,6 +8,7 @@
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "check:fetch": "if rg '\\bfetch\\(' src --glob '!src/api/client.ts' --glob '!**/*.test.ts' --glob '!**/*.spec.ts'; then echo 'Direct fetch usage found outside src/api/client.ts'; exit 1; else echo 'OK: fetch is centralized in src/api/client.ts'; fi"
   },
   "dependencies": {
@@ -22,11 +23,15 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.13.4",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^2.1.8",
     "autoprefixer": "^10.4.20",
+    "jsdom": "^29.0.2",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",

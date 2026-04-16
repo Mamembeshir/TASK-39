@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "test:unit": "find src -name '*.test.js' -type f | sort | xargs node --test",
+    "test:unit": "find tests/unit -name '*.test.js' -type f | sort | xargs node --test",
+    "test:coverage": "find tests/unit -name '*.test.js' -type f | sort | xargs node --test --experimental-test-coverage --test-coverage-exclude='**/tests/**' --test-coverage-exclude='**/scripts/**' --test-coverage-exclude='**/db.js' --test-coverage-exclude='**/dbIndexes.js' --test-coverage-exclude='**/dbSearchDocuments.js' --test-coverage-exclude='**/dbSeedFixtures.js' --test-coverage-exclude='**/app.core.js' --test-coverage-exclude='**/index.js' --test-coverage-exclude='**/bootstrap/**' --test-coverage-exclude='**/repositories/**'",
     "test:cleanup": "node src/scripts/dropTestDatabase.js",
     "lint": "eslint \"src/**/*.js\"",
     "format": "prettier --write \"src/**/*.js\"",

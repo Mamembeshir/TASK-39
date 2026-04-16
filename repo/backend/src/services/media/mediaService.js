@@ -26,11 +26,10 @@ function createMediaService(deps) {
       return explicitCount;
     }
 
-    const ownerId = media?.createdBy ? media.createdBy.toString() : null;
-    if (ownerId === actorId) {
-      return 1;
-    }
-
+    // ownerIds is the authoritative ownership list; createdBy alone is not sufficient
+    // because cleanupMediaOwnerRef removes from ownerIds but leaves createdBy in place,
+    // so using createdBy as a fallback would allow a creator to keep accessing media
+    // after their stake has been fully revoked.
     const ownerIds = Array.isArray(media?.ownerIds)
       ? media.ownerIds.map((owner) => owner?.toString?.() || String(owner))
       : [];

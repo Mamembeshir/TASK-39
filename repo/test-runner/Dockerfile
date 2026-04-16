@@ -12,14 +12,15 @@ RUN apk add --no-cache curl
 COPY backend/package*.json ./backend/
 COPY frontend/package*.json ./frontend/
 
+# Install backend deps (prod only) and all frontend deps (including test tooling)
 RUN npm --prefix ./backend ci --omit=dev && npm --prefix ./frontend ci
 
 COPY backend ./backend
 COPY frontend ./frontend
-COPY API_tests ./API_tests
-COPY unit_tests ./unit_tests
 COPY run_tests.sh ./run_tests.sh
 
-RUN chmod +x ./run_tests.sh ./API_tests/*.sh ./unit_tests/*.sh
+# API shell scripts now live inside backend/tests/api (restructured from the
+# former top-level API_tests/ directory).
+RUN chmod +x ./run_tests.sh ./backend/tests/api/*.sh
 
 CMD ["./run_tests.sh"]
