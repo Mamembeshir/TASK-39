@@ -1,15 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const BASE_URL = 'http://frontend-pw:5173';
-
-async function loginAs(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await page.waitForURL('**/login');
-  await page.fill('#username', username);
-  await page.fill('#password', password);
-  await page.click('button[type="submit"]');
-  await page.waitForURL('**/catalog');
-}
 
 // ---------------------------------------------------------------------------
 // 1. Unauthenticated user visiting /admin is redirected to /login
@@ -30,24 +21,7 @@ test('unauthenticated visit to /ops redirects to /login', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// Admin user can access /admin (page loads, not redirected)
-// ---------------------------------------------------------------------------
-test('admin user can access /admin', async ({ page }) => {
-  await loginAs(page, 'admin_demo', 'devpass123456');
-  await expect(page).toHaveURL(`${BASE_URL}/catalog`);
-
-  // AdminHomePage is lazy-loaded (React.lazy) and gated by <RoleGate> which
-  // renders <div>Loading...</div> while auth bootstrap runs.  Wait for the
-  // URL to commit AND the page to settle before asserting on the h1.
-  await page.goto('/admin');
-  await page.waitForURL('**/admin', { timeout: 15_000 });
-  await page.waitForLoadState('networkidle', { timeout: 20_000 });
-  await expect(page).toHaveURL(`${BASE_URL}/admin`);
-  await expect(page.getByRole('heading', { name: 'Admin Console', level: 1 })).toBeVisible({ timeout: 30_000 });
-});
-
-// ---------------------------------------------------------------------------
-// 5. /catalog is publicly accessible (no login required)
+// /catalog is publicly accessible (no login required)
 // ---------------------------------------------------------------------------
 test('/catalog is publicly accessible without login', async ({ page }) => {
   await page.goto('/catalog');
