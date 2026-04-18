@@ -29,6 +29,8 @@ services:
       - MEDIA_UPLOAD_DIR=/data/uploads
       - MEDIA_ENABLE_PROCESSING=false
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
+      - AUTH_RATE_LIMIT_AUTHENTICATED=${AUTH_RATE_LIMIT_AUTHENTICATED:-60}
+      - AUTH_RATE_LIMIT_UNAUTHENTICATED=${AUTH_RATE_LIMIT_UNAUTHENTICATED:-120}
       - TLS_ENABLED=${TLS_ENABLED:-true}
       - TLS_KEY_PATH=/app/certs/localhost.key
       - TLS_CERT_PATH=/app/certs/localhost.crt

@@ -29,10 +29,13 @@ test.describe('Tickets flow', () => {
   test('2. Authenticated customer sees tickets list page', async ({ page }) => {
     await loginAs(page, 'customer_demo', 'devpass123456');
 
+    // TicketsListPage is lazy-loaded (React.lazy) and gated by ProtectedRoute
+    // which shows <div>Loading...</div> until auth bootstrap finishes.  Wait
+    // for the URL to commit and the page to settle, then assert on the h1.
     await page.goto('/tickets');
-    // TicketsListPage renders "Your tickets" as an h1 for customer roles.
-    // Don't wait for networkidle (query may keep retrying) — the h1 renders immediately.
-    await expect(page.locator('h1:has-text("Your tickets")')).toBeVisible({ timeout: 20_000 });
+    await page.waitForURL('**/tickets', { timeout: 15_000 });
+    await page.waitForLoadState('networkidle', { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'Your tickets', level: 1 })).toBeVisible({ timeout: 30_000 });
   });
 
 

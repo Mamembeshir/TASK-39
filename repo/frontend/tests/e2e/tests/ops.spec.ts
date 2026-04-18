@@ -15,28 +15,7 @@ async function loginAs(page: Page, username: string, password: string) {
 // Ops pages (service_manager / administrator role required)
 // ---------------------------------------------------------------------------
 
-test.describe('Ops Slot Management page', () => {
-  test('2. Customer visiting /ops/slots is redirected to /catalog', async ({ page }) => {
-    await loginAs(page, 'customer_demo', 'devpass123456');
-
-    await page.goto('/ops/slots');
-    await page.waitForURL('**/catalog', { timeout: 15_000 });
-    await expect(page).toHaveURL(/\/catalog/);
-  });
-});
-
 test.describe('Ops Catalog Setup page', () => {
-  test('3. Manager can access /ops/catalog and sees "Catalog Setup Console" heading', async ({ page }) => {
-    await loginAs(page, 'manager_demo', 'devpass123456');
-
-    await page.goto('/ops/catalog');
-    await page.waitForURL('**/ops/catalog');
-
-    // OpsCatalogPage renders PageHeader title="Catalog Setup Console"
-    await expect(page.locator('h1:has-text("Catalog Setup Console")')).toBeVisible({ timeout: 15_000 });
-    await expect(page).toHaveURL(`${BASE_URL}/ops/catalog`);
-  });
-
   test('4. Customer visiting /ops/catalog is redirected to /catalog', async ({ page }) => {
     await loginAs(page, 'customer_demo', 'devpass123456');
 

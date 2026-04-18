@@ -49,8 +49,8 @@ const REFRESH_TOKEN_TTL = process.env.JWT_REFRESH_TTL || "7d";
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOCKOUT_THRESHOLD = 5;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const AUTHENTICATED_LIMIT = 60;
-const UNAUTHENTICATED_LIMIT = 120;
+const AUTHENTICATED_LIMIT = Number(process.env.AUTH_RATE_LIMIT_AUTHENTICATED) || 60;
+const UNAUTHENTICATED_LIMIT = Number(process.env.AUTH_RATE_LIMIT_UNAUTHENTICATED) || 120;
 
 function getWindowStart(now, windowMs) {
   return now - (now % windowMs);

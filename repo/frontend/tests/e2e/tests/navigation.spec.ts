@@ -36,12 +36,14 @@ test('admin user can access /admin', async ({ page }) => {
   await loginAs(page, 'admin_demo', 'devpass123456');
   await expect(page).toHaveURL(`${BASE_URL}/catalog`);
 
+  // AdminHomePage is lazy-loaded (React.lazy) and gated by <RoleGate> which
+  // renders <div>Loading...</div> while auth bootstrap runs.  Wait for the
+  // URL to commit AND the page to settle before asserting on the h1.
   await page.goto('/admin');
-  await page.waitForURL('**/admin');
+  await page.waitForURL('**/admin', { timeout: 15_000 });
+  await page.waitForLoadState('networkidle', { timeout: 20_000 });
   await expect(page).toHaveURL(`${BASE_URL}/admin`);
-
-  // Admin Console heading should be visible
-  await expect(page.locator('h1:has-text("Admin Console")')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Admin Console', level: 1 })).toBeVisible({ timeout: 30_000 });
 });
 
 // ---------------------------------------------------------------------------

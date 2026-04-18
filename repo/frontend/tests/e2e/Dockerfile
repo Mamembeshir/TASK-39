@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright:v1.51.0-noble
+FROM mcr.microsoft.com/playwright:v1.43.0-jammy
 
 WORKDIR /workspace/e2e
 
