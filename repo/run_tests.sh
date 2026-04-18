@@ -20,16 +20,18 @@ if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
     export INTERNAL_ROUTES_TOKEN=dev-internal-token
     export TRUST_PROXY_HEADERS=true
     export TLS_ENABLED=false
-    # Crank the rate limit way up — every E2E test logs in from the same
-    # container IP, and the default 120 req/min limit throttles login flows
-    # when the suite runs end-to-end.
-    export AUTH_RATE_LIMIT_AUTHENTICATED=10000
-    export AUTH_RATE_LIMIT_UNAUTHENTICATED=10000
 
     # Phase 1: E2E tests.
     # Bring up mongodb, api, and the playwright-specific frontend (frontend-pw),
     # then run the playwright container.  --abort-on-container-exit fires when
     # playwright exits so we capture its exit code directly.
+    #
+    # Crank the rate limit way up ONLY for E2E — every test logs in from the
+    # same container IP and would otherwise hit the 120 req/min default.
+    # Phase 2's "Auth rate limit returns 429" test needs the default, so these
+    # overrides are scoped to this `up` invocation only.
+    AUTH_RATE_LIMIT_AUTHENTICATED=10000 \
+    AUTH_RATE_LIMIT_UNAUTHENTICATED=10000 \
     docker compose up --build \
       --abort-on-container-exit --exit-code-from playwright \
       mongodb api frontend-pw playwright
@@ -47,6 +49,8 @@ if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
     # Phase 2: unit + API + Vitest tests.
     # Run only the backend/frontend services and test-runner.  When test-runner
     # exits --abort-on-container-exit fires and we capture its exit code.
+    # No rate-limit overrides here — the default 120 req/min is what the
+    # auth_rate_limit_test expects.
     docker compose up \
       --abort-on-container-exit --exit-code-from test-runner \
       mongodb api frontend test-runner
