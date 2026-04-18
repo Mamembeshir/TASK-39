@@ -169,6 +169,38 @@ function createInternalController(deps) {
       }
     },
 
+    createConfirmedOrderFixture: async (req, res, next) => {
+      try {
+        const database = getDatabase();
+        const now = new Date();
+
+        const result = await database.collection("orders").insertOne({
+          customerId: new ObjectId("65f000000000000000000001"),
+          state: "confirmed",
+          lineItems: [
+            {
+              type: "service",
+              serviceId: new ObjectId("65f000000000000000000101"),
+              durationMinutes: 60,
+              quantity: 1,
+            },
+          ],
+          slotIds: [],
+          pricingSnapshot: { subtotalBeforeTax: 100, tax: 0, total: 100 },
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        await logInternalAction(req, "internal.fixture.confirmed_order", {
+          orderId: result.insertedId.toString(),
+        });
+
+        return res.status(201).json({ orderId: result.insertedId.toString() });
+      } catch (error) {
+        return next(error);
+      }
+    },
+
     blacklistIpFixture: async (req, res, next) => {
       try {
         const ip = typeof req.body?.ip === "string" ? req.body.ip.trim() : "";

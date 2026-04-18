@@ -1,6 +1,6 @@
 # HomeCareOps
 
-## Implementation Overview
+**Project Type: Fullstack Web Application**
 
 HomeCareOps delivers end-to-end home-services operations for customers, moderators, service managers, and administrators:
 
@@ -10,8 +10,6 @@ HomeCareOps delivers end-to-end home-services operations for customers, moderato
 - Security and reliability controls: role/ownership authorization, runtime schedulers (content publish, retention cleanup, search cleanup), and HTTPS-by-default API transport.
 
 ## Run The App
-
-### Docker
 
 Generate local TLS certs first (required by default compose profile):
 
@@ -25,6 +23,14 @@ openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 365 \
 
 Note: generated cert/key files are intentionally not committed; see `certs/README.md`.
 
+Start all services:
+
+```bash
+docker-compose up
+```
+
+To rebuild images after code changes or on first run:
+
 ```bash
 docker compose up --build
 ```
@@ -34,40 +40,40 @@ App URLs:
 - Frontend: `http://localhost:5173`
 - API: `https://localhost:4000`
 
-Fixture seeding is opt-in. By default, startup does not seed demo users/data.
+## Demo Credentials
 
-### Run Without Docker
+Fixture seeding must be enabled to use demo accounts. The test runner (`./run_tests.sh`) enables seeding automatically. To seed manually, set `SEED_FIXTURES=true` in the API container environment before starting.
 
-Backend:
+| Role | Username | Password |
+|---|---|---|
+| Customer | `customer_demo` | `devpass123456` |
+| Moderator | `moderator_demo` | `devpass123456` |
+| Service Manager | `manager_demo` | `devpass123456` |
+| Administrator | `admin_demo` | `devpass123456` |
 
-```bash
-cd backend
-npm install
-cp .env.example .env
-npm start
-```
+## Verification
 
-Required backend env vars for local non-Docker runs are documented in `backend/.env.example` (notably `MONGO_URI`, `FIELD_ENCRYPTION_KEY`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`).
-`backend/.env.example` defaults to HTTPS; generate `certs/localhost.key` and `certs/localhost.crt` before starting.
-JWT secrets are required in all non-test environments, and startup rejects known placeholder values.
-
-Pricing behavior notes:
-
-- Same-day surcharge is explicit: select `sameDayPriority` to apply the $25 surcharge when slot start is within 4 hours.
-- Sales tax has an explicit `taxEnabled` toggle; disabling is blocked when the selected jurisdiction requires tax.
-
-Frontend:
+After startup, verify the application is running:
 
 ```bash
-cd frontend
-npm install
-cp .env.example .env
-npm run dev
+# API health check (-k accepts the self-signed cert)
+curl -k https://localhost:4000/api/health
+# Expected: {"status":"ok"}
 ```
 
-Frontend non-Docker env requirements are documented in `frontend/.env.example` (notably `VITE_API_BASE_URL`).
+Open `http://localhost:5173` in a browser. The catalog page should load without login. Log in with a demo credential from the table above to confirm authentication works.
 
-## LAN TLS
+## Running Tests
+
+All tests (unit + API integration + frontend + E2E) run via:
+
+```bash
+./run_tests.sh
+```
+
+This starts Docker services with fixture seeding enabled, runs the full test suite, and exits with the pass/fail code.
+
+## TLS Configuration
 
 TLS behavior:
 
@@ -76,26 +82,7 @@ TLS behavior:
 - `nginx/nginx.conf` follows the same model (`/api` proxied to `https://api:4000`).
 - Set `TLS_ENABLED=false` only for explicitly trusted local-only workflows (for example isolated test runners).
 
-Generate a local self-signed certificate:
-
-```bash
-mkdir -p certs
-openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 365 \
-  -keyout certs/localhost.key \
-  -out certs/localhost.crt \
-  -subj "/CN=localhost"
-```
-
-Run backend with HTTPS enabled (default):
-
-```bash
-cd backend
-TLS_KEY_PATH=../certs/localhost.key \
-TLS_CERT_PATH=../certs/localhost.crt \
-npm start
-```
-
-The API listens on `https://localhost:4000` by default when TLS cert paths are configured.
+TLS cert paths are passed to the API container as environment variables (`TLS_KEY_PATH`, `TLS_CERT_PATH`). See `docker-compose.yml` for the default volume and env-var wiring.
 
 ## Search Cleanup Scheduling
 
@@ -104,11 +91,10 @@ The backend includes a built-in weekly search cleanup scheduler (enabled by defa
 - `SEARCH_CLEANUP_SCHEDULER_ENABLED=true|false` (default: `true`)
 - `SEARCH_CLEANUP_INTERVAL_MS=<milliseconds>` (default: one week)
 
-You can still run cleanup manually:
+To trigger a one-off cleanup against a running container:
 
 ```bash
-cd backend
-npm run search:cleanup
+docker compose exec api npm run search:cleanup
 ```
 
 ## Content Publish Scheduling
@@ -127,11 +113,10 @@ Ticket attachment retention cleanup is also scheduled in app runtime (enabled by
 - `RETENTION_CLEANUP_INTERVAL_MS=<milliseconds>` (default: one day)
 - `RETENTION_CLEANUP_DAYS=<days>` (default: `365`)
 
-Manual cleanup remains available:
+To trigger a one-off retention pass against a running container:
 
 ```bash
-cd backend
-npm run retention:cleanup
+docker compose exec api npm run retention:cleanup
 ```
 
 ## Proxy Header Trust
@@ -172,11 +157,10 @@ Recommended paths by environment:
 - Local development: keep `SEED_FIXTURES=false` unless you explicitly need demo fixture data.
 - Test/integration runs: enable fixtures explicitly (`SEED_FIXTURES=true`), as done by `run_tests.sh`.
 
-For explicit fixture loading (without relying on startup flag), run:
+To load fixtures against a running container without restarting:
 
 ```bash
-cd backend
-npm run seed:fixtures
+docker compose exec api npm run seed:fixtures
 ```
 
 ## Architecture Snapshot

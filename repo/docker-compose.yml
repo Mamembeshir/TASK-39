@@ -100,10 +100,6 @@ services:
         condition: service_healthy
       api:
         condition: service_healthy
-      # Wait for the unit + API test pass to finish successfully before the E2E
-      # pass runs, so a single `docker compose up` drives the whole pipeline.
-      test-runner:
-        condition: service_completed_successfully
 
   test-runner:
     build:

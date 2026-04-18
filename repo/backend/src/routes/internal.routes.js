@@ -9,6 +9,7 @@ function createInternalRouter({ controller, requireAuth, requireAdministrator, r
   router.get("/seed-check", ...guards, controller.seedCheck);
   router.post("/test-fixtures/booking-slot", ...guards, controller.createBookingSlotFixture);
   router.post("/test-fixtures/completed-order", ...guards, controller.createCompletedOrderFixture);
+  router.post("/test-fixtures/confirmed-order", ...guards, controller.createConfirmedOrderFixture);
   router.post("/test-fixtures/blacklist-ip", ...guards, controller.blacklistIpFixture);
   router.post("/constraints/users-username", ...guards, controller.checkUsersUsernameConstraint);
 

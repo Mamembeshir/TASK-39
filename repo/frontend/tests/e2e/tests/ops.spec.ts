@@ -1,0 +1,85 @@
+import { test, expect, type Page } from '@playwright/test';
+
+const BASE_URL = 'http://frontend-pw:5173';
+
+async function loginAs(page: Page, username: string, password: string) {
+  await page.goto('/login');
+  await page.waitForURL('**/login');
+  await page.fill('#username', username);
+  await page.fill('#password', password);
+  await page.click('button[type="submit"]');
+  await page.waitForURL('**/catalog');
+}
+
+// ---------------------------------------------------------------------------
+// Ops pages (service_manager / administrator role required)
+// ---------------------------------------------------------------------------
+
+test.describe('Ops Slot Management page', () => {
+  test('1. Manager can access /ops/slots and sees "Slot Management" heading', async ({ page }) => {
+    await loginAs(page, 'manager_demo', 'devpass123456');
+
+    await page.goto('/ops/slots');
+    await page.waitForURL('**/ops/slots');
+
+    // OpsSlotsPage renders PageHeader title="Slot Management"
+    await expect(page.locator('h1:has-text("Slot Management")')).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(`${BASE_URL}/ops/slots`);
+  });
+
+  test('2. Customer visiting /ops/slots is redirected to /catalog', async ({ page }) => {
+    await loginAs(page, 'customer_demo', 'devpass123456');
+
+    await page.goto('/ops/slots');
+    await page.waitForURL('**/catalog', { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/catalog/);
+  });
+});
+
+test.describe('Ops Catalog Setup page', () => {
+  test('3. Manager can access /ops/catalog and sees "Catalog Setup Console" heading', async ({ page }) => {
+    await loginAs(page, 'manager_demo', 'devpass123456');
+
+    await page.goto('/ops/catalog');
+    await page.waitForURL('**/ops/catalog');
+
+    // OpsCatalogPage renders PageHeader title="Catalog Setup Console"
+    await expect(page.locator('h1:has-text("Catalog Setup Console")')).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(`${BASE_URL}/ops/catalog`);
+  });
+
+  test('4. Customer visiting /ops/catalog is redirected to /catalog', async ({ page }) => {
+    await loginAs(page, 'customer_demo', 'devpass123456');
+
+    await page.goto('/ops/catalog');
+    await page.waitForURL('**/catalog', { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/catalog/);
+  });
+});
+
+test.describe('Moderation queue page', () => {
+  test('5. Moderator can access /mod/reviews and sees "Moderation queue" heading', async ({ page }) => {
+    await loginAs(page, 'moderator_demo', 'devpass123456');
+
+    await page.goto('/mod/reviews');
+    await page.waitForURL('**/mod/reviews');
+
+    // ModerationQueuePage renders PageHeader title="Moderation queue"
+    await expect(page.locator('h1:has-text("Moderation queue")')).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(`${BASE_URL}/mod/reviews`);
+  });
+
+  test('6. Customer visiting /mod/reviews is redirected to /catalog', async ({ page }) => {
+    await loginAs(page, 'customer_demo', 'devpass123456');
+
+    await page.goto('/mod/reviews');
+    await page.waitForURL('**/catalog', { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/catalog/);
+  });
+
+  test('7. Unauthenticated visit to /mod/reviews redirects to /login', async ({ page }) => {
+    await page.goto('/mod/reviews');
+    await page.waitForURL('**/login', { timeout: 10_000 });
+    await expect(page).toHaveURL(`${BASE_URL}/login`);
+  });
+});

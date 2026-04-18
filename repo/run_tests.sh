@@ -6,26 +6,46 @@ BACKEND_DIR="${BACKEND_DIR:-$(pwd)/backend}"
 
 if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
   if command -v docker >/dev/null 2>&1; then
-    # Single entry point: one `docker compose up` drives the full pipeline.
-    # - test-runner runs unit + API + frontend Vitest with coverage
-    # - playwright depends on test-runner completing successfully
-    # - --exit-code-from playwright surfaces the overall pass/fail
-    # Developers can invoke this script OR run `docker compose up` directly
-    # with the same env-var overrides and get the same behavior.
+    # Two-phase pipeline:
+    #   Phase 1 — test-runner: unit + API + frontend Vitest with coverage
+    #   Phase 2 — playwright: E2E tests (runs only if phase 1 passes)
+    # Developers can invoke this script OR control both phases with the same
+    # env-var overrides for identical behaviour.
     docker compose down --remove-orphans
 
-    NODE_ENV=test \
+    COMPOSE_ENV="NODE_ENV=test \
       AUTH_RESPONSE_INCLUDE_TOKENS=true \
       SEED_FIXTURES=true \
       INTERNAL_ROUTES_ENABLED=true \
       INTERNAL_ROUTES_TOKEN=dev-internal-token \
       TRUST_PROXY_HEADERS=true \
-      TLS_ENABLED=false \
-      docker compose up --build --abort-on-container-exit --exit-code-from playwright
-    status=$?
+      TLS_ENABLED=false"
+
+    # Phase 1: unit + API + Vitest tests.
+    # Run only the backend/frontend services and test-runner.  When test-runner
+    # exits --abort-on-container-exit fires, which is fine — playwright hasn't
+    # started yet and we capture the exit code from test-runner directly.
+    eval "$COMPOSE_ENV docker compose up --build \
+      --abort-on-container-exit --exit-code-from test-runner \
+      mongodb api frontend test-runner"
+    tr_status=$?
+
+    if [ "$tr_status" -ne 0 ]; then
+      docker compose down --remove-orphans
+      exit "$tr_status"
+    fi
+
+    # Phase 2: E2E tests.
+    # api and frontend-pw restart (or are already healthy); playwright runs
+    # against them.  --abort-on-container-exit fires when playwright exits,
+    # giving us its exit code.
+    eval "$COMPOSE_ENV docker compose up \
+      --abort-on-container-exit --exit-code-from playwright \
+      mongodb api frontend-pw playwright"
+    pw_status=$?
 
     docker compose down --remove-orphans
-    exit "$status"
+    exit "$pw_status"
   fi
 
   echo "run_tests.sh must be run inside test-runner or with docker compose available"
@@ -110,6 +130,8 @@ run_test "Internal routes require shared token when enabled" "./backend/tests/ap
 run_test "Seed data exists and customer account is present" "./backend/tests/api/seed_check_test.sh"
 run_test "Unique username constraint is enforced" "./backend/tests/api/unique_username_test.sh"
 run_test "Auth login succeeds with seeded account" "./backend/tests/api/auth_login_success_test.sh"
+run_test "Auth refresh returns new access token" "./backend/tests/api/auth_refresh_test.sh"
+run_test "Auth logout clears session and returns ok" "./backend/tests/api/auth_logout_test.sh"
 run_test "Auth missing token returns 401" "./backend/tests/api/auth_missing_token_401_test.sh"
 run_test "Auth wrong role returns 403" "./backend/tests/api/auth_wrong_role_403_test.sh"
 run_test "Authorization matrix critical route enforcement" "./backend/tests/api/authorization_matrix_test.sh"
@@ -126,13 +148,22 @@ run_test "Catalog publish makes service visible" "./backend/tests/api/catalog_pu
 run_test "Catalog filters services by category and tags" "./backend/tests/api/catalog_filter_query_test.sh"
 run_test "Catalog rejects invalid service spec" "./backend/tests/api/catalog_invalid_spec_test.sh"
 run_test "Bundle quote uses component defaults" "./backend/tests/api/bundle_quote_defaults_test.sh"
+run_test "Quote jurisdictions endpoint returns list for customer" "./backend/tests/api/quote_jurisdictions_test.sh"
+run_test "Quote slots endpoint returns available slots for service" "./backend/tests/api/quote_slots_test.sh"
 run_test "Quote rejects invalid headcount tools and add-ons" "./backend/tests/api/quote_invalid_spec_validation_test.sh"
+run_test "Staff service update via PATCH persists changes" "./backend/tests/api/staff_service_update_test.sh"
+run_test "Staff service unpublish removes service from public catalog" "./backend/tests/api/staff_service_unpublish_test.sh"
+run_test "Staff bundle patch publish and unpublish lifecycle" "./backend/tests/api/staff_bundle_operations_test.sh"
+run_test "Content manage endpoint restricted to staff only" "./backend/tests/api/content_manage_test.sh"
 run_test "Content rejects non-content embedded media" "./backend/tests/api/content_invalid_media_purpose_test.sh"
 run_test "Structured content body publishes and reads publicly" "./backend/tests/api/content_structured_body_public_test.sh"
 run_test "Favorites add/get/delete roundtrip" "./backend/tests/api/favorites_roundtrip_test.sh"
 run_test "Favorites and compare requirement regression" "./backend/tests/api/favorites_compare_requirement_test.sh"
 run_test "Compare list rejects more than five services" "./backend/tests/api/compare_limit_test.sh"
 run_test "Order booking concurrency uses atomic slot decrement" "./backend/tests/api/order_concurrency_test.sh"
+run_test "Order cancel transitions order to cancelled state" "./backend/tests/api/order_cancel_test.sh"
+run_test "Staff capacity slot create list and delete roundtrip" "./backend/tests/api/staff_orders_slots_test.sh"
+run_test "Staff can mark an order as completed" "./backend/tests/api/staff_order_complete_test.sh"
 run_test "Media upload rejects oversized file" "./backend/tests/api/media_oversize_upload_test.sh"
 run_test "Media MIME and magic-byte validation rejects spoofed files" "./backend/tests/api/media_magic_mime_validation_test.sh"
 run_test "Media duplicate upload deduplicates by hash" "./backend/tests/api/media_dedup_test.sh"
@@ -155,11 +186,14 @@ run_test "Scheduled content auto-publishes when due" "./backend/tests/api/conten
 run_test "Content rollback updates published pointer" "./backend/tests/api/content_rollback_test.sh"
 run_test "Media delete blocked when referenced" "./backend/tests/api/media_delete_blocked_test.sh"
 run_test "Media delete enforces object ownership" "./backend/tests/api/media_delete_ownership_test.sh"
+run_test "Media authenticated file get returns file content" "./backend/tests/api/media_file_get_test.sh"
 run_test "Inbox hides moderator-only message from customer" "./backend/tests/api/inbox_role_visibility_test.sh"
 run_test "Inbox mark-read persists per user" "./backend/tests/api/inbox_mark_read_test.sh"
 run_test "Content public read returns published entries" "./backend/tests/api/content_public_read_test.sh"
 run_test "Internal seed-check rejects requests when routes disabled" "./backend/tests/api/internal_seed_check_off_test.sh"
 run_test "Moderation list returns pending items for moderators" "./backend/tests/api/moderation_list_test.sh"
+run_test "Moderator can approve a quarantined review" "./backend/tests/api/moderation_review_approve_test.sh"
+run_test "Moderator can reject a quarantined review" "./backend/tests/api/moderation_review_reject_test.sh"
 run_test "Orders list filters by customer and staff visibility" "./backend/tests/api/orders_list_test.sh"
 run_test "Question-and-answer flow visibility across roles" "./backend/tests/api/qa_flow_visibility_test.sh"
 run_test "Tickets list returns customer's tickets" "./backend/tests/api/tickets_list_test.sh"
