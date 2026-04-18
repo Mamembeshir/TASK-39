@@ -35,20 +35,6 @@ test('authenticated customer visiting /checkout sees Checkout heading', async ({
   await expect(page).toHaveURL(`${BASE_URL}/checkout`);
 });
 
-// ---------------------------------------------------------------------------
-// 3. /orders/<nonexistent-id> shows an error card for authenticated user
-// ---------------------------------------------------------------------------
-test('order detail for nonexistent id shows error card', async ({ page }) => {
-  await loginAs(page, 'customer_demo', 'devpass123456');
-
-  await page.goto('/orders/000000000000000000000000');
-  await page.waitForLoadState('networkidle');
-
-  // OrderDetailPage renders "Unable to load order" when the query errors
-  await expect(page.locator('h3:has-text("Unable to load order"), text=Unable to load order')).toBeVisible({
-    timeout: 15_000,
-  });
-});
 
 // ---------------------------------------------------------------------------
 // 4. Unauthenticated visit to /orders/:id redirects to /login

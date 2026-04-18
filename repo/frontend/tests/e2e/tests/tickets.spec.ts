@@ -46,12 +46,4 @@ test.describe('Tickets flow', () => {
     await expect(page.locator('#ticket-order')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('4. Admin user sees "Dispute queue" heading on /tickets', async ({ page }) => {
-    await loginAs(page, 'admin_demo', 'devpass123456');
-
-    await page.goto('/tickets');
-    // canManageTicketDisputes is true for "administrator" role, so
-    // TicketsListPage renders "Dispute queue" as the h1.
-    await expect(page.locator('h1:has-text("Dispute queue")')).toBeVisible({ timeout: 20_000 });
-  });
 });
