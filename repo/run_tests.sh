@@ -35,8 +35,12 @@ if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
       mongodb api frontend-pw playwright
     pw_status=$?
 
+    # Always clean up phase 1 containers (including stopped ones from
+    # --abort-on-container-exit) so phase 2 has no stale container-name
+    # conflicts like "repo-frontend-1 already in use".
+    docker compose down --remove-orphans
+
     if [ "$pw_status" -ne 0 ]; then
-      docker compose down --remove-orphans
       exit "$pw_status"
     fi
 

@@ -29,11 +29,12 @@ test.describe('Moderation queue page', () => {
   test('5. Moderator can access /mod/reviews and sees "Moderation queue" heading', async ({ page }) => {
     await loginAs(page, 'moderator_demo', 'devpass123456');
 
+    // ModerationQueuePage is lazy-loaded and gated by RoleGate.  Wait for the
+    // route to commit and the network to go idle before asserting on the h1.
     await page.goto('/mod/reviews');
-    await page.waitForURL('**/mod/reviews');
-
-    // ModerationQueuePage renders PageHeader title="Moderation queue"
-    await expect(page.locator('h1:has-text("Moderation queue")')).toBeVisible({ timeout: 15_000 });
+    await page.waitForURL('**/mod/reviews', { timeout: 15_000 });
+    await page.waitForLoadState('networkidle', { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'Moderation queue', level: 1 })).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveURL(`${BASE_URL}/mod/reviews`);
   });
 
@@ -41,7 +42,9 @@ test.describe('Moderation queue page', () => {
     await loginAs(page, 'customer_demo', 'devpass123456');
 
     await page.goto('/mod/reviews');
-    await page.waitForURL('**/catalog', { timeout: 15_000 });
+    // RoleGate sees a non-moderator and redirects via <Navigate to="/app"/>,
+    // and /app redirects to /catalog.  Give the auth bootstrap time to finish.
+    await page.waitForURL('**/catalog', { timeout: 30_000 });
     await expect(page).toHaveURL(/\/catalog/);
   });
 
