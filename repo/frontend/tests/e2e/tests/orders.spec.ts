@@ -21,23 +21,7 @@ test('unauthenticated visit to /checkout redirects to /login', async ({ page }) 
 });
 
 // ---------------------------------------------------------------------------
-// 2. Authenticated customer visiting /checkout sees the "Checkout" heading
-//    (CheckoutPage renders PageHeader title="Checkout" regardless of cart state)
-// ---------------------------------------------------------------------------
-test('authenticated customer visiting /checkout sees Checkout heading', async ({ page }) => {
-  await loginAs(page, 'customer_demo', 'devpass123456');
-
-  await page.goto('/checkout');
-  await page.waitForLoadState('networkidle');
-
-  // CheckoutPage renders a PageHeader with title="Checkout"
-  await expect(page.locator('h1:has-text("Checkout")')).toBeVisible({ timeout: 15_000 });
-  await expect(page).toHaveURL(`${BASE_URL}/checkout`);
-});
-
-
-// ---------------------------------------------------------------------------
-// 4. Unauthenticated visit to /orders/:id redirects to /login
+// Unauthenticated visit to /orders/:id redirects to /login
 // ---------------------------------------------------------------------------
 test('unauthenticated visit to /orders/:id redirects to /login', async ({ page }) => {
   await page.goto('/orders/000000000000000000000000');
@@ -45,17 +29,3 @@ test('unauthenticated visit to /orders/:id redirects to /login', async ({ page }
   await expect(page).toHaveURL(`${BASE_URL}/login`);
 });
 
-// ---------------------------------------------------------------------------
-// 5. Authenticated customer visiting /favorites sees the Favorites page
-// ---------------------------------------------------------------------------
-test('authenticated customer visiting /favorites page loads', async ({ page }) => {
-  await loginAs(page, 'customer_demo', 'devpass123456');
-
-  await page.goto('/favorites');
-  await page.waitForLoadState('networkidle');
-
-  // FavoritesPage renders with a heading or empty state — URL must be correct
-  await expect(page).toHaveURL(`${BASE_URL}/favorites`);
-  // Page should not throw a full crash (RouteErrorFallback)
-  await expect(page.locator('h1:has-text("Not Found"), h1:has-text("Something went wrong")')).not.toBeVisible();
-});

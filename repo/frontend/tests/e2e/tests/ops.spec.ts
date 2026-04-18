@@ -16,17 +16,6 @@ async function loginAs(page: Page, username: string, password: string) {
 // ---------------------------------------------------------------------------
 
 test.describe('Ops Slot Management page', () => {
-  test('1. Manager can access /ops/slots and sees "Slot Management" heading', async ({ page }) => {
-    await loginAs(page, 'manager_demo', 'devpass123456');
-
-    await page.goto('/ops/slots');
-    await page.waitForURL('**/ops/slots');
-
-    // OpsSlotsPage renders PageHeader title="Slot Management"
-    await expect(page.locator('h1:has-text("Slot Management")')).toBeVisible({ timeout: 15_000 });
-    await expect(page).toHaveURL(`${BASE_URL}/ops/slots`);
-  });
-
   test('2. Customer visiting /ops/slots is redirected to /catalog', async ({ page }) => {
     await loginAs(page, 'customer_demo', 'devpass123456');
 

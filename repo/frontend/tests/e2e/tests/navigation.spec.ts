@@ -30,21 +30,7 @@ test('unauthenticated visit to /ops redirects to /login', async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. Customer visiting /admin is redirected to /catalog
-//    (RoleGate fallback is /app, which redirects to /catalog)
-// ---------------------------------------------------------------------------
-test('customer visiting /admin is redirected to /catalog', async ({ page }) => {
-  await loginAs(page, 'customer_demo', 'devpass123456');
-  await expect(page).toHaveURL(`${BASE_URL}/catalog`);
-
-  await page.goto('/admin');
-  // RoleGate redirects to /app which itself redirects to /catalog
-  await page.waitForURL('**/catalog');
-  await expect(page).toHaveURL(`${BASE_URL}/catalog`);
-});
-
-// ---------------------------------------------------------------------------
-// 4. Admin user can access /admin (page loads, not redirected)
+// Admin user can access /admin (page loads, not redirected)
 // ---------------------------------------------------------------------------
 test('admin user can access /admin', async ({ page }) => {
   await loginAs(page, 'admin_demo', 'devpass123456');

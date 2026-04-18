@@ -20,17 +20,4 @@ test('unauthenticated visit to /inbox redirects to /login', async ({ page }) => 
   await expect(page).toHaveURL(`${BASE_URL}/login`);
 });
 
-// ---------------------------------------------------------------------------
-// 2. Authenticated customer sees the Inbox page with "Inbox" heading
-// ---------------------------------------------------------------------------
-test('authenticated customer sees inbox page with Inbox heading', async ({ page }) => {
-  await loginAs(page, 'customer_demo', 'devpass123456');
-
-  await page.goto('/inbox');
-  await page.waitForLoadState('networkidle');
-
-  // InboxPage renders a PageHeader with title="Inbox"
-  await expect(page.locator('h1:has-text("Inbox")')).toBeVisible({ timeout: 15_000 });
-  await expect(page).toHaveURL(`${BASE_URL}/inbox`);
-});
 

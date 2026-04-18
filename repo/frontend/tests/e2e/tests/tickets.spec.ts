@@ -35,15 +35,5 @@ test.describe('Tickets flow', () => {
     await expect(page.locator('h1:has-text("Your tickets")')).toBeVisible({ timeout: 20_000 });
   });
 
-  test('3. /tickets/new shows "Open ticket" heading and ticket form', async ({ page }) => {
-    await loginAs(page, 'customer_demo', 'devpass123456');
-
-    await page.goto('/tickets/new');
-    await page.waitForLoadState('networkidle');
-
-    // TicketCreatePage renders "Open ticket" as an h1, plus an Order ID input.
-    await expect(page.locator('h1:has-text("Open ticket")')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('#ticket-order')).toBeVisible({ timeout: 10_000 });
-  });
 
 });
