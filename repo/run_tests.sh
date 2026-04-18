@@ -7,8 +7,8 @@ BACKEND_DIR="${BACKEND_DIR:-$(pwd)/backend}"
 if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
   if command -v docker >/dev/null 2>&1; then
     # Two-phase pipeline:
-    #   Phase 1 — test-runner: unit + API + frontend Vitest with coverage
-    #   Phase 2 — playwright: E2E tests (runs only if phase 1 passes)
+    #   Phase 1 — playwright: E2E tests
+    #   Phase 2 — test-runner: unit + API + frontend Vitest with coverage (runs only if phase 1 passes)
     # Developers can invoke this script OR control both phases with the same
     # env-var overrides for identical behaviour.
     docker compose down --remove-orphans
@@ -21,31 +21,30 @@ if [ "${RUN_TESTS_IN_CONTAINER:-0}" != "1" ]; then
       TRUST_PROXY_HEADERS=true \
       TLS_ENABLED=false"
 
-    # Phase 1: unit + API + Vitest tests.
-    # Run only the backend/frontend services and test-runner.  When test-runner
-    # exits --abort-on-container-exit fires, which is fine — playwright hasn't
-    # started yet and we capture the exit code from test-runner directly.
+    # Phase 1: E2E tests.
+    # Bring up mongodb, api, and the playwright-specific frontend (frontend-pw),
+    # then run the playwright container.  --abort-on-container-exit fires when
+    # playwright exits so we capture its exit code directly.
     eval "$COMPOSE_ENV docker compose up --build \
-      --abort-on-container-exit --exit-code-from test-runner \
-      mongodb api frontend test-runner"
-    tr_status=$?
-
-    if [ "$tr_status" -ne 0 ]; then
-      docker compose down --remove-orphans
-      exit "$tr_status"
-    fi
-
-    # Phase 2: E2E tests.
-    # api and frontend-pw restart (or are already healthy); playwright runs
-    # against them.  --abort-on-container-exit fires when playwright exits,
-    # giving us its exit code.
-    eval "$COMPOSE_ENV docker compose up \
       --abort-on-container-exit --exit-code-from playwright \
       mongodb api frontend-pw playwright"
     pw_status=$?
 
+    if [ "$pw_status" -ne 0 ]; then
+      docker compose down --remove-orphans
+      exit "$pw_status"
+    fi
+
+    # Phase 2: unit + API + Vitest tests.
+    # Run only the backend/frontend services and test-runner.  When test-runner
+    # exits --abort-on-container-exit fires and we capture its exit code.
+    eval "$COMPOSE_ENV docker compose up \
+      --abort-on-container-exit --exit-code-from test-runner \
+      mongodb api frontend test-runner"
+    tr_status=$?
+
     docker compose down --remove-orphans
-    exit "$pw_status"
+    exit "$tr_status"
   fi
 
   echo "run_tests.sh must be run inside test-runner or with docker compose available"
